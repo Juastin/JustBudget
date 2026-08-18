@@ -8,6 +8,7 @@ arch:
   - amd64
   - armhf
   - armv7
+  - i386
 image: "juspasschier/maxbudget:{version}"
 ingress: true
 ingress_port: 3000
