@@ -8,7 +8,7 @@ arch:
   - amd64
   - armhf
   - armv7
-image: "juspasschier/maxbudget:{version}"
+image: "juspasschier/maxbudget"
 ingress: true
 ingress_port: 3000
 panel_icon: mdi:currency-eur
