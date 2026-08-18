@@ -1,0 +1,19 @@
+{
+  "name": "MaxBudget",
+  "short_name": "MaxBudget",
+  "description": "Persoonlijk budgetbeheer",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111827",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

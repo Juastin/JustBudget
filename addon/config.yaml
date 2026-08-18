@@ -1,0 +1,17 @@
+name: MaxBudget
+description: Personal budget dashboard
+version: "1.0.0"
+slug: maxbudget
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+image: "juspasschier/maxbudget:{version}"
+ingress: true
+ingress_port: 3000
+panel_icon: mdi:currency-eur
+panel_title: MaxBudget
+options: {}
+schema: {}

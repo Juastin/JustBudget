@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+maxbudget-api/dist/
+maxbudget-api/public/
+maxbudget-web/dist/
+*.tsbuildinfo
+
+# Database
+*.db
+*.db-journal
+
+# Bank statements
+*.pdf
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AI
+.claude/
