@@ -1,4 +1,4 @@
-# justBudget
+# JustBudget
 
 Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statements and ING CSV files and tracks budgets, recurring expenses, and reservations.
 
@@ -6,10 +6,10 @@ Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statem
 
 Go to **Settings → Add-ons → Add-on store → ⋮ → Repositories** and add:
 ```
-https://github.com/Juastin/justBudget
+https://github.com/Juastin/JustBudget
 ```
 
-Find **justBudget** in the add-on store and click **Install**. The app appears in the HA sidebar automatically.
+Find **JustBudget** in the add-on store and click **Install**. The app appears in the HA sidebar automatically.
 
 ---
 
