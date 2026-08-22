@@ -15,7 +15,7 @@ jobs:
       - name: Read version from config.yaml
         id: version
         run: |
-          VERSION=$(grep '^version:' maxbudget-addon/config.yaml | sed 's/version: *"//' | sed 's/"//')
+          VERSION=$(grep '^version:' justbudget-addon/config.yaml | sed 's/version: *"//' | sed 's/"//')
           echo "value=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
@@ -31,5 +31,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            juspasschier/maxbudget:${{ steps.version.outputs.value }}
-            juspasschier/maxbudget:latest
+            juspasschier/justbudget:${{ steps.version.outputs.value }}
+            juspasschier/justbudget:latest

@@ -2,9 +2,9 @@
 node_modules/
 
 # Build outputs
-maxbudget-api/dist/
-maxbudget-api/public/
-maxbudget-web/dist/
+justbudget-api/dist/
+justbudget-api/public/
+justbudget-web/dist/
 *.tsbuildinfo
 
 # Database

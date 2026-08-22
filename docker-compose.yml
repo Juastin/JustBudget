@@ -1,11 +1,11 @@
 services:
-  maxbudget:
+  justbudget:
     build: .
     ports:
       - "3000:3000"
     volumes:
-      - maxbudget-data:/data
+      - justbudget-data:/data
     restart: unless-stopped
 
 volumes:
-  maxbudget-data:
+  justbudget-data:

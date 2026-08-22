@@ -1,6 +1,6 @@
 {
-  "name": "MaxBudget",
-  "short_name": "MaxBudget",
+  "name": "justBudget",
+  "short_name": "justBudget",
   "description": "Persoonlijk budgetbeheer",
   "start_url": "/",
   "scope": "/",

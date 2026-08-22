@@ -1,17 +1,17 @@
 # Stage 1: build frontend
 FROM node:20-alpine AS frontend
 WORKDIR /build
-COPY maxbudget-web/package*.json ./
+COPY justbudget-web/package*.json ./
 RUN npm ci
-COPY maxbudget-web/ .
+COPY justbudget-web/ .
 RUN npm run build
 
 # Stage 2: build API
 FROM node:20-alpine AS api
 WORKDIR /build
-COPY maxbudget-api/package*.json ./
+COPY justbudget-api/package*.json ./
 RUN npm ci
-COPY maxbudget-api/ .
+COPY justbudget-api/ .
 RUN npm run build
 
 # Stage 3: production image

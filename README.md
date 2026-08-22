@@ -1,4 +1,4 @@
-# MaxBudget
+# justBudget
 
 Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statements and ING CSV files and tracks budgets, recurring expenses, and reservations.
 
@@ -6,10 +6,10 @@ Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statem
 
 Go to **Settings → Add-ons → Add-on store → ⋮ → Repositories** and add:
 ```
-https://github.com/Juastin/maxBudget
+https://github.com/Juastin/justBudget
 ```
 
-Find **MaxBudget** in the add-on store and click **Install**. The app appears in the HA sidebar automatically.
+Find **justBudget** in the add-on store and click **Install**. The app appears in the HA sidebar automatically.
 
 ---
 
@@ -17,14 +17,14 @@ Find **MaxBudget** in the add-on store and click **Install**. The app appears in
 
 **Backend:**
 ```bash
-cd maxbudget-api
+cd justbudget-api
 npm install
 npm run start:dev
 ```
 
 **Frontend** (in a separate terminal):
 ```bash
-cd maxbudget-web
+cd justbudget-web
 npm install
 npm run dev
 ```
@@ -38,9 +38,9 @@ Open `http://localhost:5173`. The frontend automatically proxies `/api` to the b
 ### Building and pushing the Docker image
 
 ```bash
-docker build -t juspasschier/maxbudget:1.0.0 -t juspasschier/maxbudget:latest .
-docker push juspasschier/maxbudget:1.0.0
-docker push juspasschier/maxbudget:latest
+docker build -t juspasschier/justbudget:1.0.0 -t juspasschier/justbudget:latest .
+docker push juspasschier/justbudget:1.0.0
+docker push juspasschier/justbudget:latest
 ```
 
 ### Database
