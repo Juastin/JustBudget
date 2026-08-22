@@ -16,6 +16,8 @@ const DEFAULT_CATEGORIES = [
   { name: 'Auto', color: '#ef4444' },
   { name: 'Winkelen', color: '#6366f1' },
   { name: 'Entertainment', color: '#14b8a6' },
+  { name: 'Verzekeringen', color: '#0ea5e9' },
+  { name: 'Belastingen', color: '#f97316' },
   { name: 'Overboekingen', color: '#6b7280' },
 ];
 
