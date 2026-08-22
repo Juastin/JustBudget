@@ -169,13 +169,18 @@ export class TransactionsService {
     const prevYear = curMonth === 1 ? curYear - 1 : curYear;
     const { start: prevStart, end: prevEnd } = this.payPeriodDates(prevYear, prevMonth);
 
-    const prevRecurring = await this.repo.createQueryBuilder('t')
+    const overboekingCat = await this.categoryRepo.findOneBy({ name: 'Overboekingen' });
+
+    const prevQb = this.repo.createQueryBuilder('t')
       .leftJoinAndSelect('t.category', 'category')
       .where('t.isRecurring = :r', { r: true })
       .andWhere("(t.recurringPeriod = 'monthly' OR t.recurringPeriod IS NULL)")
       .andWhere('t.transactionDate >= :prevStart', { prevStart })
-      .andWhere('t.transactionDate <= :prevEnd', { prevEnd })
-      .getMany();
+      .andWhere('t.transactionDate <= :prevEnd', { prevEnd });
+    if (overboekingCat) {
+      prevQb.andWhere('(t.categoryId != :ocid OR t.categoryId IS NULL)', { ocid: overboekingCat.id });
+    }
+    const prevRecurring = await prevQb.getMany();
 
     if (prevRecurring.length === 0) return [];
 
