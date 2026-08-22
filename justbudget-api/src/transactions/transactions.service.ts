@@ -145,6 +145,52 @@ export class TransactionsService {
     return { transactions, totalMonthlyReservation };
   }
 
+  private payPeriodDates(year: number, month: number): { start: string; end: string } {
+    const start = `${year}-${String(month).padStart(2, '0')}-20`;
+    const endDate = new Date(year, month, 19); // month is 1-indexed; JS treats it as next month (0-indexed)
+    const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-19`;
+    return { start, end };
+  }
+
+  private currentPeriodYearMonth(): { year: number; month: number } {
+    const now = new Date();
+    if (now.getDate() >= 20) return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return { year: prev.getFullYear(), month: prev.getMonth() + 1 };
+  }
+
+  async getProjectedRecurring(year?: number, month?: number) {
+    const { year: curYear, month: curMonth } =
+      year !== undefined && month !== undefined ? { year, month } : this.currentPeriodYearMonth();
+
+    const { start: curStart, end: curEnd } = this.payPeriodDates(curYear, curMonth);
+
+    const prevMonth = curMonth === 1 ? 12 : curMonth - 1;
+    const prevYear = curMonth === 1 ? curYear - 1 : curYear;
+    const { start: prevStart, end: prevEnd } = this.payPeriodDates(prevYear, prevMonth);
+
+    const prevRecurring = await this.repo.createQueryBuilder('t')
+      .leftJoinAndSelect('t.category', 'category')
+      .where('t.isRecurring = :r', { r: true })
+      .andWhere("(t.recurringPeriod = 'monthly' OR t.recurringPeriod IS NULL)")
+      .andWhere('t.transactionDate >= :prevStart', { prevStart })
+      .andWhere('t.transactionDate <= :prevEnd', { prevEnd })
+      .getMany();
+
+    if (prevRecurring.length === 0) return [];
+
+    const curAll = await this.repo.createQueryBuilder('t')
+      .where('t.transactionDate >= :curStart', { curStart })
+      .andWhere('t.transactionDate <= :curEnd', { curEnd })
+      .getMany();
+
+    const curKeys = new Set(curAll.map((t) => this.normalizeKey(t.description)));
+
+    return prevRecurring
+      .filter((t) => !curKeys.has(this.normalizeKey(t.description)))
+      .map((t) => ({ ...this.shape(t), isProjected: true }));
+  }
+
   async findRecurringByDescription(description: string): Promise<Transaction | null> {
     const key = this.normalizeKey(description);
     const candidates = await this.repo.find({ where: { isRecurring: true } });

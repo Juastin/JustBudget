@@ -47,6 +47,14 @@ export function getYearlyReservations(): Promise<ReservationsResult> {
   return apiFetch<ReservationsResult>('api/transactions/reservations');
 }
 
+export function getProjectedRecurring(year?: number, month?: number): Promise<Transaction[]> {
+  const params = new URLSearchParams();
+  if (year !== undefined) params.set('year', String(year));
+  if (month !== undefined) params.set('month', String(month));
+  const query = params.toString();
+  return apiFetch<Transaction[]>(`api/transactions/projected${query ? `?${query}` : ''}`);
+}
+
 export function getRecurringHints(year?: number, month?: number): Promise<Transaction[]> {
   const params = new URLSearchParams();
   if (year !== undefined) params.set('year', String(year));

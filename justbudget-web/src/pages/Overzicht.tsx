@@ -3,7 +3,7 @@ import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, Res
 import { formatEuro, currentPayPeriod, payPeriodLabel } from '../types';
 import { getBudgetStatus, getBudgetSummary } from '../services/budgetService';
 import { getQuickInsights } from '../services/savingsService';
-import { getRecurringTransactions, getRecurringHints, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
+import { getRecurringTransactions, getRecurringHints, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
 import { getReservationsSummary } from '../services/reservationsService';
 import KPICard from '../components/KPICard';
 import QuickInsightsList from '../components/QuickInsightsList';
@@ -27,6 +27,7 @@ export default function Overzicht() {
   const [insights, setInsights] = useState<QuickInsight[]>([]);
   const [allStatuses, setAllStatuses] = useState<BudgetStatus[]>([]);
   const [recurring, setRecurring] = useState<RecurringResult>({ transactions: [], total: 0 });
+  const [projected, setProjected] = useState<Transaction[]>([]);
   const [hints, setHints] = useState<Transaction[]>([]);
   const [reservations, setReservations] = useState<ReservationsResult>({ transactions: [], totalMonthlyReservation: 0 });
   const [reservationsSummary, setReservationsSummary] = useState<ReservationSummary | null>(null);
@@ -49,13 +50,15 @@ export default function Overzicht() {
       getBudgetStatus(period.year, period.month),
       getRecurringTransactions(period.year, period.month),
       getRecurringHints(period.year, period.month),
+      getProjectedRecurring(period.year, period.month),
     ])
-      .then(([s, i, statuses, rec, h]) => {
+      .then(([s, i, statuses, rec, h, proj]) => {
         setSummary(s);
         setInsights(i);
         setAllStatuses(statuses);
         setRecurring(rec);
         setHints(h);
+        setProjected(proj);
       })
       .finally(() => setLoading(false));
   }, [period.year, period.month]);
@@ -83,8 +86,12 @@ export default function Overzicht() {
     .filter((s) => spotlightCategories.includes(s.category))
     .sort((a, b) => b.spent - a.spent);
 
+  const projectedTotal = projected.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const displayTotalSpent = summary ? summary.totalSpent + projectedTotal : 0;
+  const displayLeftover = summary ? summary.leftover - projectedTotal : 0;
+
   const budgetBenutPct = summary && summary.totalBudget > 0
-    ? Math.round((summary.totalSpent / summary.totalBudget) * 100)
+    ? Math.round((displayTotalSpent / summary.totalBudget) * 100)
     : 0;
 
   async function handleToggleRecurring(id: number) {
@@ -170,17 +177,17 @@ export default function Overzicht() {
         />
         <KPICard
           label="Totaal uitgegeven"
-          value={summary ? formatEuro(summary.totalSpent) : '—'}
+          value={summary ? formatEuro(displayTotalSpent) : '—'}
           variant="default"
           subtitleNode={
             summary && summary.previousTotalSpent > 0 ? (
               <span className={
-                summary.totalSpent > summary.previousTotalSpent
+                displayTotalSpent > summary.previousTotalSpent
                   ? 'text-red-500 dark:text-red-400'
                   : 'text-green-600 dark:text-green-400'
               }>
-                {summary.totalSpent > summary.previousTotalSpent ? '▲' : '▼'}{' '}
-                {formatEuro(Math.abs(summary.totalSpent - summary.previousTotalSpent))} t.o.v. vorige maand
+                {displayTotalSpent > summary.previousTotalSpent ? '▲' : '▼'}{' '}
+                {formatEuro(Math.abs(displayTotalSpent - summary.previousTotalSpent))} t.o.v. vorige maand
               </span>
             ) : undefined
           }
@@ -188,7 +195,7 @@ export default function Overzicht() {
         {(() => {
           const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
           const jaarresAmt = reservations.totalMonthlyReservation;
-          const adjusted = summary ? summary.leftover - reservatieAmt - jaarresAmt : 0;
+          const adjusted = summary ? displayLeftover - reservatieAmt - jaarresAmt : 0;
           const parts: string[] = [];
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
           if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
@@ -277,15 +284,15 @@ export default function Overzicht() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex flex-col">
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Terugkerende uitgaven</h2>
-            {(recurring.transactions.length > 0 || reservations.transactions.length > 0) && (
+            {(recurring.transactions.length > 0 || projected.length > 0 || reservations.transactions.length > 0) && (
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                {formatEuro(Math.abs(recurring.total) + reservations.totalMonthlyReservation)}
+                {formatEuro(Math.abs(recurring.total) + projectedTotal + reservations.totalMonthlyReservation)}
               </span>
             )}
           </div>
           <div className="overflow-y-auto max-h-72 -mr-2 pr-2">
 
-        {hints.length === 0 && recurring.transactions.length === 0 && reservations.transactions.length === 0 ? (
+        {hints.length === 0 && recurring.transactions.length === 0 && projected.length === 0 && reservations.transactions.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">Geen terugkerende uitgaven gevonden</p>
         ) : (
           <>
@@ -327,7 +334,7 @@ export default function Overzicht() {
               </div>
             )}
 
-            {recurring.transactions.length > 0 && (
+            {(recurring.transactions.length > 0 || projected.length > 0) && (
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {recurring.transactions.map((t) => (
                   <div key={t.id} className="flex items-center justify-between py-2.5 gap-4">
@@ -354,6 +361,19 @@ export default function Overzicht() {
                         ✕
                       </button>
                     </div>
+                  </div>
+                ))}
+                {projected.map((t) => (
+                  <div key={`proj-${t.id}`} className="flex items-center justify-between py-2.5 gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{t.description}</p>
+                      {t.categoryName && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{t.categoryName}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-gray-400 dark:text-gray-500 shrink-0">
+                      {formatEuro(t.amount)}
+                    </span>
                   </div>
                 ))}
               </div>

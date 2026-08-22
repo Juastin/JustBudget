@@ -45,6 +45,14 @@ export class TransactionsController {
     );
   }
 
+  @Get('projected')
+  getProjectedRecurring(@Query('year') year?: string, @Query('month') month?: string) {
+    return this.service.getProjectedRecurring(
+      year ? parseInt(year, 10) : undefined,
+      month ? parseInt(month, 10) : undefined,
+    );
+  }
+
   @Post('detect-recurring') @HttpCode(200)
   detectRecurring() {
     return this.service.detectRecurring();
