@@ -1,6 +1,6 @@
-name: justBudget
+name: JustBudget
 description: Personal budget dashboard
-version: "1.1.1"
+version: "1.1.2"
 slug: justbudget
 init: false
 arch:
