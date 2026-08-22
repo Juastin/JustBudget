@@ -1,6 +1,6 @@
 # MaxBudget
 
-Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statements and tracks budgets, recurring expenses, and reservations.
+Personal budget dashboard built with NestJS + React. Imports Rabobank PDF statements and ING CSV files and tracks budgets, recurring expenses, and reservations.
 
 ## Installation (Home Assistant)
 
