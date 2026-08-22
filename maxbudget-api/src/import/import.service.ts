@@ -5,18 +5,26 @@ import { Transaction } from '../entities/transaction.entity';
 import { CategoryRulesService } from '../category-rules/category-rules.service';
 import { TransactionsService } from '../transactions/transactions.service';
 import { PdfParserService } from './pdf-parser.service';
+import { IngCsvParserService } from './ing-csv-parser.service';
 
 @Injectable()
 export class ImportService {
   constructor(
     @InjectRepository(Transaction) private readonly txRepo: Repository<Transaction>,
     private readonly pdfParser: PdfParserService,
+    private readonly ingCsvParser: IngCsvParserService,
     private readonly rulesService: CategoryRulesService,
     private readonly transactionsService: TransactionsService,
   ) {}
 
-  async preview(buffer: Buffer) {
-    const parsed = await this.pdfParser.parse(buffer);
+  private async parsedTransactions(buffer: Buffer, filename: string) {
+    return filename.toLowerCase().endsWith('.csv')
+      ? this.ingCsvParser.parse(buffer)
+      : await this.pdfParser.parse(buffer);
+  }
+
+  async preview(buffer: Buffer, filename: string) {
+    const parsed = await this.parsedTransactions(buffer, filename);
     const results = [];
     let newCount = 0;
     let existingCount = 0;
@@ -45,8 +53,8 @@ export class ImportService {
     };
   }
 
-  async confirm(buffer: Buffer) {
-    const parsed = await this.pdfParser.parse(buffer);
+  async confirm(buffer: Buffer, filename: string) {
+    const parsed = await this.parsedTransactions(buffer, filename);
     let imported = 0;
     let skipped = 0;
 

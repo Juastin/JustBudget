@@ -7,6 +7,7 @@ import { TransactionsModule } from '../transactions/transactions.module';
 import { ImportController } from './import.controller';
 import { ImportService } from './import.service';
 import { PdfParserService } from './pdf-parser.service';
+import { IngCsvParserService } from './ing-csv-parser.service';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { PdfParserService } from './pdf-parser.service';
     TransactionsModule,
   ],
   controllers: [ImportController],
-  providers: [ImportService, PdfParserService],
+  providers: [ImportService, PdfParserService, IngCsvParserService],
 })
 export class ImportModule {}

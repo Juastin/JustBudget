@@ -6,15 +6,15 @@ import { ImportService } from './import.service';
 export class ImportController {
   constructor(private readonly service: ImportService) {}
 
-  @Post('pdf-preview')
-  @UseInterceptors(FileInterceptor('file', { storage: undefined })) // memoryStorage
+  @Post('preview')
+  @UseInterceptors(FileInterceptor('file', { storage: undefined }))
   preview(@UploadedFile() file: Express.Multer.File) {
-    return this.service.preview(file.buffer);
+    return this.service.preview(file.buffer, file.originalname);
   }
 
-  @Post('pdf-confirm')
+  @Post('confirm')
   @UseInterceptors(FileInterceptor('file', { storage: undefined }))
   confirm(@UploadedFile() file: Express.Multer.File) {
-    return this.service.confirm(file.buffer);
+    return this.service.confirm(file.buffer, file.originalname);
   }
 }

@@ -2,6 +2,28 @@ import { useRef, useState } from 'react';
 import { formatDate, formatEuro } from '../types';
 import CategoryBadge from './CategoryBadge';
 
+type Bank = 'rabobank' | 'ing';
+
+const BANK_STORAGE_KEY = 'preferredBank';
+
+function getPreferredBank(): Bank {
+  const stored = localStorage.getItem(BANK_STORAGE_KEY);
+  return stored === 'ing' ? 'ing' : 'rabobank';
+}
+
+const BANK_CONFIG: Record<Bank, { label: string; accept: string; hint: string }> = {
+  rabobank: {
+    label: 'Rabobank',
+    accept: '.pdf',
+    hint: 'Sleep een Rabobank PDF-afschrift hierheen',
+  },
+  ing: {
+    label: 'ING',
+    accept: '.csv',
+    hint: 'Sleep een ING CSV-export hierheen',
+  },
+};
+
 interface PreviewTransaction {
   transactionDate: string;
   code: string;
@@ -35,6 +57,7 @@ interface Props {
 type Step = 'upload' | 'preview' | 'result';
 
 export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
+  const [bank, setBank] = useState<Bank>(getPreferredBank);
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -46,6 +69,15 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const config = BANK_CONFIG[bank];
+
+  function handleBankChange(next: Bank) {
+    setBank(next);
+    localStorage.setItem(BANK_STORAGE_KEY, next);
+    setFile(null);
+    setError(null);
+  }
 
   function reset() {
     setStep('upload');
@@ -65,8 +97,10 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
 
   function handleFileSelect(selected: File | null) {
     if (!selected) return;
-    if (!selected.name.toLowerCase().endsWith('.pdf')) {
-      setError('Alleen PDF-bestanden zijn toegestaan.');
+    const ext = selected.name.toLowerCase().split('.').pop();
+    const expectedExt = config.accept.replace('.', '');
+    if (ext !== expectedExt) {
+      setError(`Verwacht een ${config.accept.toUpperCase()}-bestand voor ${config.label}.`);
       return;
     }
     setError(null);
@@ -86,7 +120,7 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
     try {
       const body = new FormData();
       body.append('file', file);
-      const res = await fetch('api/import/pdf-preview', { method: 'POST', body });
+      const res = await fetch('api/import/preview', { method: 'POST', body });
       if (!res.ok) throw new Error(`Server fout: ${res.status}`);
       const data: PreviewResult = await res.json();
       setPreview(data);
@@ -105,7 +139,7 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
     try {
       const body = new FormData();
       body.append('file', file);
-      const res = await fetch('api/import/pdf-confirm', { method: 'POST', body });
+      const res = await fetch('api/import/confirm', { method: 'POST', body });
       if (!res.ok) throw new Error(`Server fout: ${res.status}`);
       const data: ConfirmResult = await res.json();
       setResult(data);
@@ -131,7 +165,7 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">PDF importeren</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Transacties importeren</h2>
             <div className="flex items-center gap-2 mt-1">
               {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
                 <span key={s} className="flex items-center gap-2">
@@ -159,9 +193,26 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
           {/* ── Step 1: Upload ── */}
           {step === 'upload' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Upload een Rabobank rekeningafschrift (PDF) om transacties te importeren.
-              </p>
+
+              {/* Bank selector */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Bank</p>
+                <div className="flex gap-2">
+                  {(Object.keys(BANK_CONFIG) as Bank[]).map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => handleBankChange(b)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                        bank === b
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      {BANK_CONFIG[b].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Drop zone */}
               <div
@@ -180,7 +231,7 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf"
+                  accept={config.accept}
                   className="hidden"
                   onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
                 />
@@ -203,7 +254,7 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
                     <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Sleep een PDF hierheen</p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{config.hint}</p>
                     <p className="text-xs text-gray-400">of klik om te bladeren</p>
                   </div>
                 )}
