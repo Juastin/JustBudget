@@ -180,16 +180,23 @@ export default function Overzicht() {
           value={summary ? formatEuro(displayTotalSpent) : '—'}
           variant="default"
           subtitleNode={
-            summary && summary.previousTotalSpent > 0 ? (
-              <span className={
-                displayTotalSpent > summary.previousTotalSpent
-                  ? 'text-red-500 dark:text-red-400'
-                  : 'text-green-600 dark:text-green-400'
-              }>
-                {displayTotalSpent > summary.previousTotalSpent ? '▲' : '▼'}{' '}
-                {formatEuro(Math.abs(displayTotalSpent - summary.previousTotalSpent))} t.o.v. vorige maand
-              </span>
-            ) : undefined
+            <span className="flex flex-col gap-0.5">
+              {projectedTotal > 0 && (
+                <span className="text-gray-400 dark:text-gray-500">
+                  incl. {formatEuro(projectedTotal)} voorspeld terugkerend
+                </span>
+              )}
+              {summary && summary.previousTotalSpent > 0 && (
+                <span className={
+                  displayTotalSpent > summary.previousTotalSpent
+                    ? 'text-red-500 dark:text-red-400'
+                    : 'text-green-600 dark:text-green-400'
+                }>
+                  {displayTotalSpent > summary.previousTotalSpent ? '▲' : '▼'}{' '}
+                  {formatEuro(Math.abs(displayTotalSpent - summary.previousTotalSpent))} t.o.v. vorige maand
+                </span>
+              )}
+            </span>
           }
         />
         {(() => {
