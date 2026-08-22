@@ -145,6 +145,12 @@ export class TransactionsService {
     return { transactions, totalMonthlyReservation };
   }
 
+  async findRecurringByDescription(description: string): Promise<Transaction | null> {
+    const key = this.normalizeKey(description);
+    const candidates = await this.repo.find({ where: { isRecurring: true } });
+    return candidates.find((t) => this.normalizeKey(t.description) === key) ?? null;
+  }
+
   async getRecurringHints(year?: number, month?: number) {
     const qb = this.repo.createQueryBuilder('t')
       .leftJoinAndSelect('t.category', 'category')

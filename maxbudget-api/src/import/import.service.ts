@@ -55,6 +55,7 @@ export class ImportService {
       if (exists) { skipped++; continue; }
 
       const category = await this.rulesService.findMatchingCategory(t.description);
+      const recurringTemplate = await this.transactionsService.findRecurringByDescription(t.description);
       const tx = this.txRepo.create({
         description: t.description,
         amount: t.amount,
@@ -62,6 +63,8 @@ export class ImportService {
         hash: t.hash,
         categoryId: category?.id ?? undefined,
         category: category ?? undefined,
+        isRecurring: recurringTemplate?.isRecurring ?? false,
+        recurringPeriod: recurringTemplate?.recurringPeriod ?? 'monthly',
       });
       await this.txRepo.save(tx);
       imported++;
