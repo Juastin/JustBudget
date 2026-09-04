@@ -1,4 +1,4 @@
-import type { Budget, BudgetStatus, BudgetSummary } from '../types';
+import type { Budget, BudgetAverage, BudgetStatus, BudgetSummary } from '../types';
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -21,6 +21,10 @@ export function getBudgetStatus(year?: number, month?: number): Promise<BudgetSt
 
 export function getBudgets(): Promise<Budget[]> {
   return apiFetch<Budget[]>('api/budgets');
+}
+
+export function getBudgetAverages(year?: number): Promise<BudgetAverage[]> {
+  return apiFetch<BudgetAverage[]>(`api/budget-averages${year !== undefined ? `?year=${year}` : ''}`);
 }
 
 export interface UpdateBudgetPayload {

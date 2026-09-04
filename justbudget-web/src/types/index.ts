@@ -28,6 +28,13 @@ export interface BudgetStatus {
   warnThreshold: number | null;
 }
 
+export interface BudgetAverage {
+  categoryId: number;
+  category: string;
+  average: number | null;
+  monthsCounted: number;
+}
+
 export interface BudgetSummary {
   salary: number;
   totalBudget: number;

@@ -1,7 +1,7 @@
 import { IsBoolean, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdateBudgetDto {
-  @IsNumber() @Min(0)
+  @IsNumber()
   amount: number;
 
   @IsOptional() @IsBoolean()

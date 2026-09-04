@@ -18,7 +18,7 @@ export class InsightsService {
           type: 'danger',
           message: `${s.category} heeft het budget overschreden met € ${Math.abs(s.remaining).toFixed(2).replace('.', ',')}`,
         });
-      } else if (s.budget > 0 && s.warnThreshold != null && s.percentage >= s.warnThreshold) {
+      } else if (s.budget !== 0 && s.warnThreshold != null && s.percentage >= s.warnThreshold) {
         insights.push({
           id: id++,
           type: 'warning',
@@ -26,7 +26,7 @@ export class InsightsService {
         });
       }
 
-      if (s.notifyPaid && s.budget > 0 && !s.overBudget && s.percentage >= 100) {
+      if (s.notifyPaid && s.budget !== 0 && !s.overBudget && s.percentage >= 100) {
         insights.push({ id: id++, type: 'success', message: `${s.category} is betaald` });
       }
     }

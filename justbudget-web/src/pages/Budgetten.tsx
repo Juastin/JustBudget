@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { BudgetStatus } from '../types';
+import type { BudgetAverage, BudgetStatus } from '../types';
 import { formatEuro, currentPayPeriod, payPeriodLabel } from '../types';
-import { getBudgetStatus, updateBudget } from '../services/budgetService';
+import { getBudgetAverages, getBudgetStatus, updateBudget } from '../services/budgetService';
 import { createCategory, deleteCategory, updateCategory } from '../services/categoryService';
 import BudgetCard from '../components/BudgetCard';
 import BudgetEditModal from '../components/BudgetEditModal';
@@ -11,6 +11,7 @@ import PeriodSelector from '../components/PeriodSelector';
 export default function Budgetten() {
   const [period, setPeriod] = useState(currentPayPeriod);
   const [statuses, setStatuses] = useState<BudgetStatus[]>([]);
+  const [averages, setAverages] = useState<BudgetAverage[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingStatus, setEditingStatus] = useState<BudgetStatus | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -18,14 +19,20 @@ export default function Budgetten() {
   async function load() {
     setLoading(true);
     try {
-      const data = await getBudgetStatus(period.year, period.month);
+      const [data, avg] = await Promise.all([
+        getBudgetStatus(period.year, period.month),
+        getBudgetAverages(period.year),
+      ]);
       setStatuses(data);
+      setAverages(avg);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => { load(); }, [period.year, period.month]);
+
+  const averageByCategory = new Map(averages.map((a) => [a.categoryId, a]));
 
   async function handleSave(budgetId: number, amount: number, name: string, notifyPaid: boolean, warnThreshold: number | null) {
     const status = statuses.find((s) => s.budgetId === budgetId);
@@ -146,6 +153,7 @@ export default function Budgetten() {
             <BudgetCard
               key={s.budgetId}
               status={s}
+              average={averageByCategory.get(s.categoryId) ?? null}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />

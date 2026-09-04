@@ -92,7 +92,7 @@ export class BudgetsService {
         const spent = -Number(rows?.total ?? 0);
         const budget = Number(b.amount);
         const remaining = budget - spent;
-        const percentage = budget > 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
+        const percentage = budget !== 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
         const previousSpent = prevSpentMap.get(b.categoryId) ?? 0;
 
         return {
@@ -103,7 +103,7 @@ export class BudgetsService {
           budget,
           spent,
           remaining,
-          overBudget: budget > 0 && spent > budget,
+          overBudget: budget !== 0 && spent > budget,
           percentage,
           previousSpent: Math.round(previousSpent * 100) / 100,
           delta: Math.round((spent - previousSpent) * 100) / 100,
@@ -187,6 +187,50 @@ export class BudgetsService {
     };
   }
 
+  async getYearlyAverages(year?: number) {
+    await this.ensureBudgets();
+    const targetYear = year ?? new Date().getFullYear();
+    const budgets = await this.budgetRepo.find({ relations: ['category'], order: { id: 'ASC' } });
+
+    const monthlySpent = new Map<number, number[]>();
+    budgets.forEach((b) => monthlySpent.set(b.categoryId, []));
+
+    for (let month = 1; month <= 12; month++) {
+      const { start, end } = this.payPeriod(targetYear, month);
+      const rows = await this.txRepo
+        .createQueryBuilder('t')
+        .select('t.categoryId', 'categoryId')
+        .addSelect('SUM(t.amount)', 'total')
+        .where('t.transactionDate >= :start', { start })
+        .andWhere('t.transactionDate <= :end', { end })
+        .groupBy('t.categoryId')
+        .getRawMany<{ categoryId: number | string; total: string | null }>();
+
+      for (const row of rows) {
+        const categoryId = Number(row.categoryId);
+        const spent = -Number(row.total ?? 0);
+        // Only count periods with actual activity, so categories that didn't exist yet
+        // (or had no transactions) don't drag the average down. Non-zero covers both
+        // expense categories (positive spent) and refund/income-style categories with
+        // a negative budget (negative spent).
+        if (spent !== 0 && monthlySpent.has(categoryId)) {
+          monthlySpent.get(categoryId)!.push(spent);
+        }
+      }
+    }
+
+    return budgets.map((b) => {
+      const amounts = monthlySpent.get(b.categoryId) ?? [];
+      const average = amounts.length > 0 ? amounts.reduce((s, v) => s + v, 0) / amounts.length : null;
+      return {
+        categoryId: b.categoryId,
+        category: b.category?.name ?? '',
+        average: average !== null ? Math.round(average * 100) / 100 : null,
+        monthsCounted: amounts.length,
+      };
+    });
+  }
+
   async update(id: number, dto: UpdateBudgetDto) {
     const budget = await this.budgetRepo.findOne({ where: { id }, relations: ['category'] });
     if (!budget) throw new NotFoundException('Budget niet gevonden');
@@ -216,8 +260,8 @@ export class BudgetsService {
       budget: amount,
       spent,
       remaining,
-      overBudget: amount > 0 && spent > amount,
-      percentage: amount > 0 ? Math.round((spent / amount) * 1000) / 10 : 0,
+      overBudget: amount !== 0 && spent > amount,
+      percentage: amount !== 0 ? Math.round((spent / amount) * 1000) / 10 : 0,
       notifyPaid: budget.notifyPaid,
       warnThreshold: budget.warnThreshold,
     };

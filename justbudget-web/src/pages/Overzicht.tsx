@@ -252,10 +252,10 @@ export default function Overzicht() {
                 <div className="flex justify-between items-baseline mb-1.5">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.category}</span>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {formatEuro(s.spent)}{s.budget > 0 && <span className="text-xs"> / {formatEuro(s.budget)}</span>}
+                    {formatEuro(s.spent)}{s.budget !== 0 && <span className="text-xs"> / {formatEuro(s.budget)}</span>}
                   </span>
                 </div>
-                <ProgressBar percentage={s.budget > 0 ? s.percentage : 0} height="sm" />
+                <ProgressBar percentage={s.budget !== 0 ? s.percentage : 0} height="sm" />
               </div>
             ))}
             {spotlightStatuses.length === 0 && (

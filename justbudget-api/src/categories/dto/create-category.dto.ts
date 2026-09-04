@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateCategoryDto {
   @IsString() @MaxLength(100)
@@ -10,6 +10,6 @@ export class CreateCategoryDto {
   @IsString() @IsOptional()
   color?: string;
 
-  @IsNumber() @IsOptional() @Min(0)
+  @IsNumber() @IsOptional()
   budgetAmount?: number;
 }

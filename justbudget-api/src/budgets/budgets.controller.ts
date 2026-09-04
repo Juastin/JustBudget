@@ -27,6 +27,11 @@ export class BudgetsController {
     );
   }
 
+  @Get('budget-averages')
+  getAverages(@Query('year') year?: string) {
+    return this.service.getYearlyAverages(year ? parseInt(year, 10) : undefined);
+  }
+
   @Put('budgets/:id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBudgetDto) {
     return this.service.update(id, dto);

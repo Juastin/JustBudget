@@ -1,16 +1,23 @@
 import { useState } from 'react';
-import type { BudgetStatus } from '../types';
+import type { BudgetAverage, BudgetStatus } from '../types';
 import { formatEuro } from '../types';
 import ProgressBar from './ProgressBar';
 
 interface Props {
   status: BudgetStatus;
+  average?: BudgetAverage | null;
   onEdit: (budgetId: number) => void;
   onDelete: (categoryId: number) => void;
 }
 
-export default function BudgetCard({ status, onEdit, onDelete }: Props) {
+export default function BudgetCard({ status, average, onEdit, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false);
+
+  // Gap between the yearly average and the budget, as a % of the budget's size.
+  // Using the budget's size (not the raw value) keeps this working the same way
+  // for negative budgets (e.g. a category that expects a net refund).
+  const avgDiff = average?.average != null ? average.average - status.budget : null;
+  const avgDiffPct = avgDiff !== null && status.budget !== 0 ? avgDiff / Math.abs(status.budget) : null;
 
   if (confirming) {
     return (
@@ -96,6 +103,21 @@ export default function BudgetCard({ status, onEdit, onDelete }: Props) {
       </div>
 
       <ProgressBar percentage={status.percentage} showPercentage height="md" />
+
+      {average && average.average !== null && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+          <span>
+            Gemiddeld dit jaar: <span className="font-medium text-gray-700 dark:text-gray-300">{formatEuro(average.average)}</span>
+            /mnd ({average.monthsCounted} {average.monthsCounted === 1 ? 'maand' : 'maanden'})
+          </span>
+          {avgDiffPct !== null && avgDiffPct > 0.1 && (
+            <span className="text-amber-600 dark:text-amber-400 font-medium">▲ {formatEuro(avgDiff!)}</span>
+          )}
+          {avgDiffPct !== null && avgDiffPct < -0.15 && (
+            <span className="text-green-600 dark:text-green-400 font-medium">▼ {formatEuro(-avgDiff!)}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

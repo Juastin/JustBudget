@@ -12,13 +12,13 @@ const heightClasses = {
 };
 
 function getColorClass(percentage: number): string {
-  if (percentage > 100) return 'bg-red-500';
+  if (percentage < 0 || percentage > 100) return 'bg-red-500';
   if (percentage >= 80) return 'bg-yellow-500';
   return 'bg-green-500';
 }
 
 export default function ProgressBar({ percentage, label, showPercentage = false, height = 'md' }: ProgressBarProps) {
-  const visualWidth = Math.min(percentage, 100);
+  const visualWidth = Math.max(0, Math.min(percentage, 100));
   const colorClass = getColorClass(percentage);
 
   return (

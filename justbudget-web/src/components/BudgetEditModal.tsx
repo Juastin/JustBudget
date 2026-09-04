@@ -72,7 +72,6 @@ export default function BudgetEditModal({
         </label>
         <input
           type="number"
-          min="0"
           step="1"
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
