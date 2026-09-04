@@ -16,17 +16,17 @@ export const CATEGORIES: Category[] = [
 ];
 
 export const BUDGET_STATUS: BudgetStatus[] = [
-  { budgetId: 1, categoryId: 1, category: 'Hypotheek', color: '#3b82f6', budget: 1200, spent: 1200, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0 },
-  { budgetId: 2, categoryId: 2, category: 'Boodschappen', color: '#22c55e', budget: 600, spent: 522, remaining: 78, overBudget: false, percentage: 87, previousSpent: 0, delta: 0 },
-  { budgetId: 3, categoryId: 3, category: 'Elektriciteit', color: '#eab308', budget: 150, spent: 142, remaining: 8, overBudget: false, percentage: 94.7, previousSpent: 0, delta: 0 },
-  { budgetId: 4, categoryId: 4, category: 'Gas', color: '#f97316', budget: 120, spent: 85, remaining: 35, overBudget: false, percentage: 70.8, previousSpent: 0, delta: 0 },
-  { budgetId: 5, categoryId: 5, category: 'Internet', color: '#8b5cf6', budget: 55, spent: 55, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0 },
-  { budgetId: 6, categoryId: 6, category: 'Mobiele telefoon', color: '#ec4899', budget: 45, spent: 45, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0 },
-  { budgetId: 7, categoryId: 7, category: 'Kinderopvang', color: '#f43f5e', budget: 900, spent: 900, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0 },
-  { budgetId: 8, categoryId: 8, category: 'Uit eten', color: '#f59e0b', budget: 200, spent: 125, remaining: 75, overBudget: false, percentage: 62.5, previousSpent: 0, delta: 0 },
-  { budgetId: 9, categoryId: 9, category: 'Brandstof', color: '#ef4444', budget: 180, spent: 137, remaining: 43, overBudget: false, percentage: 76.1, previousSpent: 0, delta: 0 },
-  { budgetId: 10, categoryId: 10, category: 'Winkelen', color: '#6366f1', budget: 150, spent: 183, remaining: -33, overBudget: true, percentage: 122, previousSpent: 0, delta: 0 },
-  { budgetId: 11, categoryId: 11, category: 'Entertainment', color: '#14b8a6', budget: 60, spent: 42.98, remaining: 17.02, overBudget: false, percentage: 71.6, previousSpent: 0, delta: 0 },
+  { budgetId: 1, categoryId: 1, category: 'Hypotheek', color: '#3b82f6', budget: 1200, spent: 1200, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0, notifyPaid: true, warnThreshold: null },
+  { budgetId: 2, categoryId: 2, category: 'Boodschappen', color: '#22c55e', budget: 600, spent: 522, remaining: 78, overBudget: false, percentage: 87, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 3, categoryId: 3, category: 'Elektriciteit', color: '#eab308', budget: 150, spent: 142, remaining: 8, overBudget: false, percentage: 94.7, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 4, categoryId: 4, category: 'Gas', color: '#f97316', budget: 120, spent: 85, remaining: 35, overBudget: false, percentage: 70.8, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 5, categoryId: 5, category: 'Internet', color: '#8b5cf6', budget: 55, spent: 55, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 6, categoryId: 6, category: 'Mobiele telefoon', color: '#ec4899', budget: 45, spent: 45, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 7, categoryId: 7, category: 'Kinderopvang', color: '#f43f5e', budget: 900, spent: 900, remaining: 0, overBudget: false, percentage: 100, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 8, categoryId: 8, category: 'Uit eten', color: '#f59e0b', budget: 200, spent: 125, remaining: 75, overBudget: false, percentage: 62.5, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 9, categoryId: 9, category: 'Brandstof', color: '#ef4444', budget: 180, spent: 137, remaining: 43, overBudget: false, percentage: 76.1, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 10, categoryId: 10, category: 'Winkelen', color: '#6366f1', budget: 150, spent: 183, remaining: -33, overBudget: true, percentage: 122, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
+  { budgetId: 11, categoryId: 11, category: 'Entertainment', color: '#14b8a6', budget: 60, spent: 42.98, remaining: 17.02, overBudget: false, percentage: 71.6, previousSpent: 0, delta: 0, notifyPaid: false, warnThreshold: 80 },
 ];
 
 export const BUDGET_SUMMARY: BudgetSummary = {

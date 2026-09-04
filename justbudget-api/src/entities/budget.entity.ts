@@ -12,6 +12,12 @@ export class Budget {
   @Column('decimal', { precision: 10, scale: 2, default: 0 })
   amount: number;
 
+  @Column({ default: false })
+  notifyPaid: boolean;
+
+  @Column({ type: 'int', nullable: true, default: 80 })
+  warnThreshold: number | null;
+
   @ManyToOne(() => Category, (c) => c.budgets, { onDelete: 'CASCADE' })
   category: Category;
 }

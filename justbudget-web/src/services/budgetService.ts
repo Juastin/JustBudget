@@ -23,10 +23,16 @@ export function getBudgets(): Promise<Budget[]> {
   return apiFetch<Budget[]>('api/budgets');
 }
 
-export function updateBudget(budgetId: number, amount: number): Promise<BudgetStatus> {
+export interface UpdateBudgetPayload {
+  amount: number;
+  notifyPaid?: boolean;
+  warnThreshold?: number | null;
+}
+
+export function updateBudget(budgetId: number, payload: UpdateBudgetPayload): Promise<BudgetStatus> {
   return apiFetch<BudgetStatus>(`api/budgets/${budgetId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify(payload),
   });
 }

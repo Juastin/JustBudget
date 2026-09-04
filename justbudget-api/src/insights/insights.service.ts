@@ -18,18 +18,17 @@ export class InsightsService {
           type: 'danger',
           message: `${s.category} heeft het budget overschreden met € ${Math.abs(s.remaining).toFixed(2).replace('.', ',')}`,
         });
-      } else if (s.percentage >= 80) {
+      } else if (s.budget > 0 && s.warnThreshold != null && s.percentage >= s.warnThreshold) {
         insights.push({
           id: id++,
           type: 'warning',
-          message: `${s.category} heeft ${Math.round(s.percentage)}% van het budget gebruikt`,
+          message: `${s.category} is op ${Math.round(s.percentage)}% van het budget`,
         });
       }
-    }
 
-    const onTrack = statuses.filter((s) => s.percentage === 100 && !s.overBudget);
-    for (const s of onTrack.slice(0, 2)) {
-      insights.push({ id: id++, type: 'success', message: `${s.category} is succesvol betaald` });
+      if (s.notifyPaid && s.budget > 0 && !s.overBudget && s.percentage >= 100) {
+        insights.push({ id: id++, type: 'success', message: `${s.category} is betaald` });
+      }
     }
 
     if (summary.leftover > 0) {

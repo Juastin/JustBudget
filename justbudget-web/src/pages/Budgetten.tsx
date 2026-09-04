@@ -27,10 +27,10 @@ export default function Budgetten() {
 
   useEffect(() => { load(); }, [period.year, period.month]);
 
-  async function handleSave(budgetId: number, amount: number, name: string) {
+  async function handleSave(budgetId: number, amount: number, name: string, notifyPaid: boolean, warnThreshold: number | null) {
     const status = statuses.find((s) => s.budgetId === budgetId);
     await Promise.all([
-      updateBudget(budgetId, amount),
+      updateBudget(budgetId, { amount, notifyPaid, warnThreshold }),
       status && name !== status.category ? updateCategory(status.categoryId, { name }) : Promise.resolve(),
     ]);
     const updated = await getBudgetStatus(period.year, period.month);
@@ -158,6 +158,8 @@ export default function Budgetten() {
         budgetId={editingStatus?.budgetId ?? null}
         categoryName={editingStatus?.category ?? ''}
         currentAmount={editingStatus?.budget ?? 0}
+        currentNotifyPaid={editingStatus?.notifyPaid ?? false}
+        currentWarnThreshold={editingStatus?.warnThreshold ?? null}
         onClose={() => setEditingStatus(null)}
         onSave={handleSave}
       />

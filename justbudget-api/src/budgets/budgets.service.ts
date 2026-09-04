@@ -107,6 +107,8 @@ export class BudgetsService {
           percentage,
           previousSpent: Math.round(previousSpent * 100) / 100,
           delta: Math.round((spent - previousSpent) * 100) / 100,
+          notifyPaid: b.notifyPaid,
+          warnThreshold: b.warnThreshold,
         };
       }),
     );
@@ -189,6 +191,8 @@ export class BudgetsService {
     const budget = await this.budgetRepo.findOne({ where: { id }, relations: ['category'] });
     if (!budget) throw new NotFoundException('Budget niet gevonden');
     budget.amount = dto.amount;
+    if (dto.notifyPaid !== undefined) budget.notifyPaid = dto.notifyPaid;
+    if (dto.warnThreshold !== undefined) budget.warnThreshold = dto.warnThreshold;
     await this.budgetRepo.save(budget);
 
     // Return updated status for the current period
@@ -214,6 +218,8 @@ export class BudgetsService {
       remaining,
       overBudget: amount > 0 && spent > amount,
       percentage: amount > 0 ? Math.round((spent / amount) * 1000) / 10 : 0,
+      notifyPaid: budget.notifyPaid,
+      warnThreshold: budget.warnThreshold,
     };
   }
 

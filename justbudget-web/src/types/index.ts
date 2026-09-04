@@ -24,6 +24,8 @@ export interface BudgetStatus {
   percentage: number;
   previousSpent: number;
   delta: number;
+  notifyPaid: boolean;
+  warnThreshold: number | null;
 }
 
 export interface BudgetSummary {
