@@ -27,9 +27,6 @@ export class Transaction {
   @Column({ nullable: true, default: 'monthly' })
   recurringPeriod: string;
 
-  @Column({ default: false })
-  recurringHint: boolean;
-
   @CreateDateColumn()
   createdAt: Date;
 

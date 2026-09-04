@@ -48,7 +48,6 @@ export interface Transaction {
   hash: string;
   isRecurring?: boolean;
   recurringPeriod?: 'monthly' | 'yearly';
-  recurringHint?: boolean;
   isProjected?: boolean;
 }
 

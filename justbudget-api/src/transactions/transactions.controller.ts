@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Put, Query } from '@nestjs/common';
 import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { TransactionsService } from './transactions.service';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
@@ -37,25 +37,12 @@ export class TransactionsController {
     return this.service.getYearlyReservations();
   }
 
-  @Get('hints')
-  getRecurringHints(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.getRecurringHints(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
-  }
-
   @Get('projected')
   getProjectedRecurring(@Query('year') year?: string, @Query('month') month?: string) {
     return this.service.getProjectedRecurring(
       year ? parseInt(year, 10) : undefined,
       month ? parseInt(month, 10) : undefined,
     );
-  }
-
-  @Post('detect-recurring') @HttpCode(200)
-  detectRecurring() {
-    return this.service.detectRecurring();
   }
 
   @Put(':id/category')

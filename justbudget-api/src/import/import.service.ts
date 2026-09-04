@@ -78,7 +78,6 @@ export class ImportService {
       imported++;
     }
 
-    await this.transactionsService.detectRecurring();
     return { status: 'success', parsed: parsed.length, imported, skipped };
   }
 }

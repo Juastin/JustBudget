@@ -70,11 +70,6 @@ export default function TransactionTable({ transactions, categories, onChangeCat
                         Terugkerend
                       </span>
                     )}
-                    {t.recurringHint && !t.isRecurring && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
-                        Hint
-                      </span>
-                    )}
                   </div>
                 </td>
                 <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${t.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>

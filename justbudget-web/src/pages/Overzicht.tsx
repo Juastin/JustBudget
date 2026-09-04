@@ -3,7 +3,7 @@ import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, Res
 import { formatEuro, currentPayPeriod, payPeriodLabel } from '../types';
 import { getBudgetStatus, getBudgetSummary } from '../services/budgetService';
 import { getQuickInsights } from '../services/savingsService';
-import { getRecurringTransactions, getRecurringHints, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
+import { getRecurringTransactions, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
 import { getReservationsSummary } from '../services/reservationsService';
 import KPICard from '../components/KPICard';
 import QuickInsightsList from '../components/QuickInsightsList';
@@ -28,7 +28,6 @@ export default function Overzicht() {
   const [allStatuses, setAllStatuses] = useState<BudgetStatus[]>([]);
   const [recurring, setRecurring] = useState<RecurringResult>({ transactions: [], total: 0 });
   const [projected, setProjected] = useState<Transaction[]>([]);
-  const [hints, setHints] = useState<Transaction[]>([]);
   const [reservations, setReservations] = useState<ReservationsResult>({ transactions: [], totalMonthlyReservation: 0 });
   const [reservationsSummary, setReservationsSummary] = useState<ReservationSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,15 +48,13 @@ export default function Overzicht() {
       getQuickInsights(period.year, period.month),
       getBudgetStatus(period.year, period.month),
       getRecurringTransactions(period.year, period.month),
-      getRecurringHints(period.year, period.month),
       getProjectedRecurring(period.year, period.month),
     ])
-      .then(([s, i, statuses, rec, h, proj]) => {
+      .then(([s, i, statuses, rec, proj]) => {
         setSummary(s);
         setInsights(i);
         setAllStatuses(statuses);
         setRecurring(rec);
-        setHints(h);
         setProjected(proj);
       })
       .finally(() => setLoading(false));
@@ -88,11 +85,9 @@ export default function Overzicht() {
 
   const projectedTotal = projected.reduce((s, t) => s + Math.abs(t.amount), 0);
   const displayTotalSpent = summary ? summary.totalSpent + projectedTotal : 0;
-  const displayLeftover = summary ? summary.leftover - projectedTotal : 0;
-
-  const budgetBenutPct = summary && summary.totalBudget > 0
-    ? Math.round((displayTotalSpent / summary.totalBudget) * 100)
-    : 0;
+  const overBudgetTotal = allStatuses
+    .filter((s) => s.category !== 'Salaris' && s.category !== 'Overboekingen')
+    .reduce((s, b) => s + Math.max(0, b.spent - b.budget), 0);
 
   async function handleToggleRecurring(id: number) {
     await setTransactionRecurring(id, false);
@@ -109,23 +104,6 @@ export default function Overzicht() {
     ]);
     setRecurring(newRec);
     setReservations(newRes);
-  }
-
-  async function handleConfirmHint(id: number) {
-    const updated = await setTransactionRecurring(id, true);
-    setHints((prev) => prev.filter((h) => h.id !== id));
-    setRecurring((prev) => {
-      const newTransactions = [...prev.transactions, updated];
-      return {
-        transactions: newTransactions,
-        total: newTransactions.reduce((s, t) => s + t.amount, 0),
-      };
-    });
-  }
-
-  async function handleDismissHint(id: number) {
-    await setTransactionRecurring(id, false);
-    setHints((prev) => prev.filter((h) => h.id !== id));
   }
 
   function formatShort(dateStr: string) {
@@ -168,7 +146,7 @@ export default function Overzicht() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <KPICard
           label="Inkomen"
           value={summary ? formatEuro(summary.salary) : '—'}
@@ -181,9 +159,9 @@ export default function Overzicht() {
           variant="default"
           subtitleNode={
             <span className="flex flex-col gap-0.5">
-              {projectedTotal > 0 && (
+              {summary && summary.totalBudget > 0 && (
                 <span className="text-gray-400 dark:text-gray-500">
-                  incl. {formatEuro(projectedTotal)} voorspeld terugkerend
+                  incl. {formatEuro(summary.totalBudget)} gebudgeteerd
                 </span>
               )}
               {summary && summary.previousTotalSpent > 0 && (
@@ -202,27 +180,24 @@ export default function Overzicht() {
         {(() => {
           const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
           const jaarresAmt = reservations.totalMonthlyReservation;
-          const adjusted = summary ? displayLeftover - reservatieAmt - jaarresAmt : 0;
+          const verwachtSaldo = summary
+            ? summary.salary - summary.totalBudget - overBudgetTotal - reservatieAmt - jaarresAmt
+            : 0;
           const parts: string[] = [];
+          if (overBudgetTotal > 0) parts.push(`${formatEuro(overBudgetTotal)} over budget`);
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
           if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
           return (
             <KPICard
-              label="Resterend"
-              value={summary ? formatEuro(adjusted) : '—'}
-              variant={summary ? (adjusted < 0 ? 'danger' : 'info') : 'info'}
+              label="Verwacht saldo einde maand"
+              value={summary ? formatEuro(verwachtSaldo) : '—'}
+              variant={summary ? (verwachtSaldo < 0 ? 'danger' : 'info') : 'info'}
               subtitleNode={summary && parts.length > 0 ? (
                 <span className="text-gray-400 dark:text-gray-500">incl. {parts.join(' + ')}</span>
               ) : undefined}
             />
           );
         })()}
-        <KPICard
-          label="Budget benut"
-          value={`${budgetBenutPct}%`}
-          subtitle={summary ? `van ${formatEuro(summary.totalBudget)}` : undefined}
-          variant={budgetBenutPct > 100 ? 'danger' : budgetBenutPct >= 80 ? 'warning' : 'default'}
-        />
       </div>
 
       {summary?.latestTransactionDate && (
@@ -299,48 +274,10 @@ export default function Overzicht() {
           </div>
           <div className="overflow-y-auto max-h-72 -mr-2 pr-2">
 
-        {hints.length === 0 && recurring.transactions.length === 0 && projected.length === 0 && reservations.transactions.length === 0 ? (
+        {recurring.transactions.length === 0 && projected.length === 0 && reservations.transactions.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">Geen terugkerende uitgaven gevonden</p>
         ) : (
           <>
-            {hints.length > 0 && (
-              <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Mogelijk terugkerend</h3>
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200">
-                    {hints.length}
-                  </span>
-                </div>
-                <div className="divide-y divide-amber-100 dark:divide-amber-800/40">
-                  {hints.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between py-2 gap-4">
-                      <div className="min-w-0">
-                        <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{t.description}</p>
-                        {t.categoryName && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500">{t.categoryName}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatEuro(t.amount)}</span>
-                        <button
-                          onClick={() => handleConfirmHint(t.id)}
-                          className="text-xs font-medium px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                        >
-                          Bevestigen
-                        </button>
-                        <button
-                          onClick={() => handleDismissHint(t.id)}
-                          className="text-xs font-medium px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors"
-                        >
-                          Negeren
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {(recurring.transactions.length > 0 || projected.length > 0) && (
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {recurring.transactions.map((t) => (

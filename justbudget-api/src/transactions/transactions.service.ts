@@ -20,7 +20,6 @@ export class TransactionsService {
       hash: t.hash,
       isRecurring: t.isRecurring,
       recurringPeriod: (t.recurringPeriod ?? 'monthly') as 'monthly' | 'yearly',
-      recurringHint: t.recurringHint,
       categoryId: t.categoryId ?? undefined,
       categoryName: t.category?.name ?? undefined,
       color: t.category?.color ?? undefined,
@@ -50,47 +49,6 @@ export class TransactionsService {
     return description.toLowerCase().trim().split(/\s+/).slice(0, 3).join(' ');
   }
 
-  private payPeriodKey(dateStr: string): string {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (d >= 20) return `${y}-${m}`;
-    if (m === 1) return `${y - 1}-12`;
-    return `${y}-${m - 1}`;
-  }
-
-  async detectRecurring(): Promise<void> {
-    const all = await this.repo.find();
-    const expenses = all.filter((t) => Number(t.amount) < 0);
-
-    const keyToPeriods = new Map<string, Set<string>>();
-    const keyToIds = new Map<string, number[]>();
-
-    for (const tx of expenses) {
-      const key = this.normalizeKey(tx.description);
-      const period = this.payPeriodKey(tx.transactionDate);
-      if (!keyToPeriods.has(key)) { keyToPeriods.set(key, new Set()); keyToIds.set(key, []); }
-      keyToPeriods.get(key)!.add(period);
-      keyToIds.get(key)!.push(tx.id);
-    }
-
-    const recurringIds = new Set<number>();
-    for (const [key, periods] of keyToPeriods) {
-      if (periods.size >= 2) keyToIds.get(key)!.forEach((id) => recurringIds.add(id));
-    }
-
-    const toUpdate: Transaction[] = [];
-    for (const tx of expenses) {
-      if (tx.isRecurring) continue; // never touch confirmed recurring
-      if (recurringIds.has(tx.id) && !tx.recurringHint) {
-        toUpdate.push({ ...tx, recurringHint: true });
-      } else if (!recurringIds.has(tx.id) && tx.recurringHint) {
-        toUpdate.push({ ...tx, recurringHint: false });
-      }
-    }
-    if (toUpdate.length > 0) {
-      await this.repo.save(toUpdate);
-    }
-  }
-
   async getRecurring(year?: number, month?: number) {
     const qb = this.repo.createQueryBuilder('t')
       .leftJoinAndSelect('t.category', 'category')
@@ -115,7 +73,6 @@ export class TransactionsService {
     const tx = await this.repo.findOne({ where: { id }, relations: ['category'] });
     if (!tx) throw new NotFoundException('Transactie niet gevonden');
     tx.isRecurring = isRecurring;
-    tx.recurringHint = false;
     if (isRecurring) tx.recurringPeriod = period;
     const saved = await this.repo.save(tx);
     return this.shape(saved);
@@ -200,25 +157,6 @@ export class TransactionsService {
     const key = this.normalizeKey(description);
     const candidates = await this.repo.find({ where: { isRecurring: true } });
     return candidates.find((t) => this.normalizeKey(t.description) === key) ?? null;
-  }
-
-  async getRecurringHints(year?: number, month?: number) {
-    const qb = this.repo.createQueryBuilder('t')
-      .leftJoinAndSelect('t.category', 'category')
-      .where('t.recurringHint = :hint', { hint: true })
-      .andWhere('t.isRecurring = :r', { r: false });
-
-    if (year !== undefined && month !== undefined) {
-      const start = `${year}-${String(month).padStart(2, '0')}-20`;
-      const endDate = new Date(year, month, 19);
-      const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-19`;
-      qb.andWhere('t.transactionDate >= :start', { start })
-        .andWhere('t.transactionDate <= :end', { end });
-    }
-
-    qb.orderBy('t.amount', 'ASC');
-    const rows = await qb.getMany();
-    return rows.map((r) => this.shape(r));
   }
 
   async updateCategory(id: number, categoryId: number) {
