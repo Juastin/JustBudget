@@ -11,7 +11,6 @@ export class InsightsService {
 
   async getInsights(year?: number, month?: number) {
     const statuses = await this.budgetsService.getBudgetStatus(year, month);
-    const summary = await this.budgetsService.getBudgetSummary(year, month);
     const insights: Array<{ id: number; type: 'success' | 'warning' | 'danger' | 'info'; message: string }> = [];
     let id = 1;
 
@@ -33,14 +32,6 @@ export class InsightsService {
       if (s.notifyPaid && s.budget !== 0 && !s.overBudget && s.percentage >= PAID_THRESHOLD) {
         insights.push({ id: id++, type: 'success', message: `${s.category} is betaald` });
       }
-    }
-
-    if (summary.leftover > 0) {
-      insights.push({
-        id: id++,
-        type: 'info',
-        message: `Je hebt nog € ${summary.leftover.toFixed(2).replace('.', ',')} over in deze periode`,
-      });
     }
 
     return insights;
