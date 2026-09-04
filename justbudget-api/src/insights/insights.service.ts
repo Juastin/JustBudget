@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetsService } from '../budgets/budgets.service';
 
+// Spend rarely lands on exactly 100% of a budget (rounding, a few cents' difference),
+// so "paid" is treated as reaching this percentage rather than an exact match.
+const PAID_THRESHOLD = 95;
+
 @Injectable()
 export class InsightsService {
   constructor(private readonly budgetsService: BudgetsService) {}
@@ -26,7 +30,7 @@ export class InsightsService {
         });
       }
 
-      if (s.notifyPaid && s.budget !== 0 && !s.overBudget && s.percentage >= 100) {
+      if (s.notifyPaid && s.budget !== 0 && !s.overBudget && s.percentage >= PAID_THRESHOLD) {
         insights.push({ id: id++, type: 'success', message: `${s.category} is betaald` });
       }
     }

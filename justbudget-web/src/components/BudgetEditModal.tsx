@@ -88,7 +88,7 @@ export default function BudgetEditModal({
             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">
-            Toon melding zodra {name || 'deze categorie'} volledig betaald is
+            Toon melding zodra {name || 'deze categorie'} betaald is (≥95% van het budget)
           </span>
         </label>
 
