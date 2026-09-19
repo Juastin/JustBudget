@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Budget } from '../entities/budget.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { Category } from '../entities/category.entity';
+import { PeriodsService } from '../periods/periods.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 
 @Injectable()
@@ -12,37 +13,8 @@ export class BudgetsService {
     @InjectRepository(Budget) private readonly budgetRepo: Repository<Budget>,
     @InjectRepository(Transaction) private readonly txRepo: Repository<Transaction>,
     @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
+    private readonly periodsService: PeriodsService,
   ) {}
-
-  // Pay period: 20th of the start month to 19th of the next month.
-  private payPeriod(year?: number, month?: number): { start: string; end: string } {
-    let startYear: number;
-    let startMonth: number; // 0-indexed
-
-    if (year !== undefined && month !== undefined) {
-      startYear = year;
-      startMonth = month - 1;
-    } else {
-      const now = new Date();
-      if (now.getDate() >= 20) {
-        startYear = now.getFullYear();
-        startMonth = now.getMonth();
-      } else {
-        const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        startYear = prev.getFullYear();
-        startMonth = prev.getMonth();
-      }
-    }
-
-    const endDate = new Date(startYear, startMonth + 1, 19);
-    const fmt = (y: number, m: number, d: number) =>
-      `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
-    return {
-      start: fmt(startYear, startMonth, 20),
-      end: fmt(endDate.getFullYear(), endDate.getMonth(), 19),
-    };
-  }
 
   async findAll() {
     await this.ensureBudgets();
@@ -58,36 +30,33 @@ export class BudgetsService {
     }));
   }
 
-  async getBudgetStatus(year?: number, month?: number) {
+  async getBudgetStatus(periodStart?: string) {
     await this.ensureBudgets();
-    const { start, end } = this.payPeriod(year, month);
+    const { start, end } = await this.periodsService.getPeriod(periodStart);
     const budgets = await this.budgetRepo.find({ relations: ['category'], order: { id: 'ASC' } });
 
-    const [startYear, startMonth] = start.split('-').map(Number);
-    const prev = this.payPeriod(
-      startMonth === 1 ? startYear - 1 : startYear,
-      startMonth === 1 ? 12 : startMonth - 1,
-    );
+    const prev = await this.periodsService.getAdjacentPeriod(start, 'prev');
 
-    const prevRows = await this.txRepo
+    const prevRowsQb = this.txRepo
       .createQueryBuilder('t')
       .select('t.categoryId', 'categoryId')
       .addSelect('SUM(t.amount)', 'total')
-      .where('t.transactionDate >= :prevStart', { prevStart: prev.start })
-      .andWhere('t.transactionDate <= :prevEnd', { prevEnd: prev.end })
+      .where('t.transactionDate >= :prevStart', { prevStart: prev.start });
+    if (prev.end) prevRowsQb.andWhere('t.transactionDate <= :prevEnd', { prevEnd: prev.end });
+    const prevRows = await prevRowsQb
       .groupBy('t.categoryId')
       .getRawMany<{ categoryId: number | string; total: string | null }>();
     const prevSpentMap = new Map(prevRows.map((r) => [Number(r.categoryId), -Number(r.total ?? 0)]));
 
     const results = await Promise.all(
       budgets.map(async (b) => {
-        const rows = await this.txRepo
+        const rowsQb = this.txRepo
           .createQueryBuilder('t')
           .select('SUM(t.amount)', 'total')
           .where('t.categoryId = :cid', { cid: b.categoryId })
-          .andWhere('t.transactionDate >= :start', { start })
-          .andWhere('t.transactionDate <= :end', { end })
-          .getRawOne<{ total: string | null }>();
+          .andWhere('t.transactionDate >= :start', { start });
+        if (end) rowsQb.andWhere('t.transactionDate <= :end', { end });
+        const rows = await rowsQb.getRawOne<{ total: string | null }>();
 
         const spent = -Number(rows?.total ?? 0);
         const budget = Number(b.amount);
@@ -116,14 +85,9 @@ export class BudgetsService {
     return results;
   }
 
-  async getBudgetSummary(year?: number, month?: number) {
-    const { start, end } = this.payPeriod(year, month);
-
-    const [startYear, startMonth] = start.split('-').map(Number);
-    const prev = this.payPeriod(
-      startMonth === 1 ? startYear - 1 : startYear,
-      startMonth === 1 ? 12 : startMonth - 1,
-    );
+  async getBudgetSummary(periodStart?: string) {
+    const { start, end } = await this.periodsService.getPeriod(periodStart);
+    const prev = await this.periodsService.getAdjacentPeriod(start, 'prev');
 
     const [salaryCategory, overboekingCategory] = await Promise.all([
       this.categoryRepo.findOneBy({ name: 'Salaris' }),
@@ -132,13 +96,13 @@ export class BudgetsService {
 
     let salary = 0;
     if (salaryCategory) {
-      const row = await this.txRepo
+      const rowQb = this.txRepo
         .createQueryBuilder('t')
         .select('SUM(t.amount)', 'total')
         .where('t.categoryId = :cid', { cid: salaryCategory.id })
-        .andWhere('t.transactionDate >= :start', { start })
-        .andWhere('t.transactionDate <= :end', { end })
-        .getRawOne<{ total: string | null }>();
+        .andWhere('t.transactionDate >= :start', { start });
+      if (end) rowQb.andWhere('t.transactionDate <= :end', { end });
+      const row = await rowQb.getRawOne<{ total: string | null }>();
       salary = Number(row?.total ?? 0);
     }
 
@@ -146,8 +110,8 @@ export class BudgetsService {
       .createQueryBuilder('t')
       .select('SUM(t.amount)', 'total')
       .where('t.transactionDate >= :start', { start })
-      .andWhere('t.transactionDate <= :end', { end })
       .andWhere('t.amount < 0');
+    if (end) spentQb.andWhere('t.transactionDate <= :end', { end });
     if (overboekingCategory) {
       spentQb.andWhere('(t.categoryId != :ocid OR t.categoryId IS NULL)', { ocid: overboekingCategory.id });
     }
@@ -162,8 +126,8 @@ export class BudgetsService {
       .createQueryBuilder('t')
       .select('SUM(t.amount)', 'total')
       .where('t.transactionDate >= :prevStart', { prevStart: prev.start })
-      .andWhere('t.transactionDate <= :prevEnd', { prevEnd: prev.end })
       .andWhere('t.amount < 0');
+    if (prev.end) prevSpentQb.andWhere('t.transactionDate <= :prevEnd', { prevEnd: prev.end });
     if (overboekingCategory) {
       prevSpentQb.andWhere('(t.categoryId != :ocid OR t.categoryId IS NULL)', { ocid: overboekingCategory.id });
     }
@@ -195,14 +159,15 @@ export class BudgetsService {
     const monthlySpent = new Map<number, number[]>();
     budgets.forEach((b) => monthlySpent.set(b.categoryId, []));
 
-    for (let month = 1; month <= 12; month++) {
-      const { start, end } = this.payPeriod(targetYear, month);
-      const rows = await this.txRepo
+    const periods = await this.periodsService.listPeriodsInYear(targetYear);
+    for (const { start, end } of periods) {
+      const rowsQb = this.txRepo
         .createQueryBuilder('t')
         .select('t.categoryId', 'categoryId')
         .addSelect('SUM(t.amount)', 'total')
-        .where('t.transactionDate >= :start', { start })
-        .andWhere('t.transactionDate <= :end', { end })
+        .where('t.transactionDate >= :start', { start });
+      if (end) rowsQb.andWhere('t.transactionDate <= :end', { end });
+      const rows = await rowsQb
         .groupBy('t.categoryId')
         .getRawMany<{ categoryId: number | string; total: string | null }>();
 
@@ -240,14 +205,14 @@ export class BudgetsService {
     await this.budgetRepo.save(budget);
 
     // Return updated status for the current period
-    const { start, end } = this.payPeriod();
-    const rows = await this.txRepo
+    const { start, end } = await this.periodsService.getPeriod();
+    const rowsQb = this.txRepo
       .createQueryBuilder('t')
       .select('SUM(t.amount)', 'total')
       .where('t.categoryId = :cid', { cid: budget.categoryId })
-      .andWhere('t.transactionDate >= :start', { start })
-      .andWhere('t.transactionDate <= :end', { end })
-      .getRawOne<{ total: string | null }>();
+      .andWhere('t.transactionDate >= :start', { start });
+    if (end) rowsQb.andWhere('t.transactionDate <= :end', { end });
+    const rows = await rowsQb.getRawOne<{ total: string | null }>();
 
     const spent = -Number(rows?.total ?? 0);
     const amount = Number(dto.amount);

@@ -3,12 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from '../entities/transaction.entity';
 import { Category } from '../entities/category.entity';
+import { PeriodsService } from '../periods/periods.service';
+import { normalizeKey } from '../common/normalize-key';
 
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectRepository(Transaction) private readonly repo: Repository<Transaction>,
     @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
+    private readonly periodsService: PeriodsService,
   ) {}
 
   private shape(t: Transaction) {
@@ -26,42 +29,28 @@ export class TransactionsService {
     };
   }
 
-  async findAll(year?: number, month?: number) {
+  async findAll(periodStart?: string) {
     const qb = this.repo.createQueryBuilder('t').leftJoinAndSelect('t.category', 'category');
 
-    if (year !== undefined && month !== undefined) {
-      // Filter by pay period: 20th of start month to 19th of next month
-      const start = `${year}-${String(month).padStart(2, '0')}-20`;
-      const endDate = new Date(year, month, 19); // month is 1-indexed, so this is next month's 19th
-      const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-19`;
-      qb.where('t.transactionDate >= :start', { start })
-        .andWhere('t.transactionDate <= :end', { end });
-    } else if (year !== undefined) {
-      qb.where(`strftime('%Y', t.transactionDate) = :y`, { y: String(year) });
-    }
+    const { start, end } = await this.periodsService.getPeriod(periodStart);
+    qb.where('t.transactionDate >= :start', { start });
+    if (end) qb.andWhere('t.transactionDate <= :end', { end });
 
     qb.orderBy('t.transactionDate', 'DESC').addOrderBy('t.id', 'DESC');
     const rows = await qb.getMany();
     return rows.map((r) => this.shape(r));
   }
 
-  private normalizeKey(description: string): string {
-    return description.toLowerCase().trim().split(/\s+/).slice(0, 3).join(' ');
-  }
 
-  async getRecurring(year?: number, month?: number) {
+  async getRecurring(periodStart?: string) {
     const qb = this.repo.createQueryBuilder('t')
       .leftJoinAndSelect('t.category', 'category')
       .where('t.isRecurring = :r', { r: true })
       .andWhere("(t.recurringPeriod = 'monthly' OR t.recurringPeriod IS NULL)");
 
-    if (year !== undefined && month !== undefined) {
-      const start = `${year}-${String(month).padStart(2, '0')}-20`;
-      const endDate = new Date(year, month, 19);
-      const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-19`;
-      qb.andWhere('t.transactionDate >= :start', { start })
-        .andWhere('t.transactionDate <= :end', { end });
-    }
+    const { start, end } = await this.periodsService.getPeriod(periodStart);
+    qb.andWhere('t.transactionDate >= :start', { start });
+    if (end) qb.andWhere('t.transactionDate <= :end', { end });
 
     qb.orderBy('t.amount', 'ASC');
     const rows = await qb.getMany();
@@ -102,29 +91,9 @@ export class TransactionsService {
     return { transactions, totalMonthlyReservation };
   }
 
-  private payPeriodDates(year: number, month: number): { start: string; end: string } {
-    const start = `${year}-${String(month).padStart(2, '0')}-20`;
-    const endDate = new Date(year, month, 19); // month is 1-indexed; JS treats it as next month (0-indexed)
-    const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-19`;
-    return { start, end };
-  }
-
-  private currentPeriodYearMonth(): { year: number; month: number } {
-    const now = new Date();
-    if (now.getDate() >= 20) return { year: now.getFullYear(), month: now.getMonth() + 1 };
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return { year: prev.getFullYear(), month: prev.getMonth() + 1 };
-  }
-
-  async getProjectedRecurring(year?: number, month?: number) {
-    const { year: curYear, month: curMonth } =
-      year !== undefined && month !== undefined ? { year, month } : this.currentPeriodYearMonth();
-
-    const { start: curStart, end: curEnd } = this.payPeriodDates(curYear, curMonth);
-
-    const prevMonth = curMonth === 1 ? 12 : curMonth - 1;
-    const prevYear = curMonth === 1 ? curYear - 1 : curYear;
-    const { start: prevStart, end: prevEnd } = this.payPeriodDates(prevYear, prevMonth);
+  async getProjectedRecurring(periodStart?: string) {
+    const { start: curStart, end: curEnd } = await this.periodsService.getPeriod(periodStart);
+    const { start: prevStart, end: prevEnd } = await this.periodsService.getAdjacentPeriod(curStart, 'prev');
 
     const overboekingCat = await this.categoryRepo.findOneBy({ name: 'Overboekingen' });
 
@@ -132,8 +101,8 @@ export class TransactionsService {
       .leftJoinAndSelect('t.category', 'category')
       .where('t.isRecurring = :r', { r: true })
       .andWhere("(t.recurringPeriod = 'monthly' OR t.recurringPeriod IS NULL)")
-      .andWhere('t.transactionDate >= :prevStart', { prevStart })
-      .andWhere('t.transactionDate <= :prevEnd', { prevEnd });
+      .andWhere('t.transactionDate >= :prevStart', { prevStart });
+    if (prevEnd) prevQb.andWhere('t.transactionDate <= :prevEnd', { prevEnd });
     if (overboekingCat) {
       prevQb.andWhere('(t.categoryId != :ocid OR t.categoryId IS NULL)', { ocid: overboekingCat.id });
     }
@@ -141,22 +110,22 @@ export class TransactionsService {
 
     if (prevRecurring.length === 0) return [];
 
-    const curAll = await this.repo.createQueryBuilder('t')
-      .where('t.transactionDate >= :curStart', { curStart })
-      .andWhere('t.transactionDate <= :curEnd', { curEnd })
-      .getMany();
+    const curAllQb = this.repo.createQueryBuilder('t')
+      .where('t.transactionDate >= :curStart', { curStart });
+    if (curEnd) curAllQb.andWhere('t.transactionDate <= :curEnd', { curEnd });
+    const curAll = await curAllQb.getMany();
 
-    const curKeys = new Set(curAll.map((t) => this.normalizeKey(t.description)));
+    const curKeys = new Set(curAll.map((t) => normalizeKey(t.description)));
 
     return prevRecurring
-      .filter((t) => !curKeys.has(this.normalizeKey(t.description)))
+      .filter((t) => !curKeys.has(normalizeKey(t.description)))
       .map((t) => ({ ...this.shape(t), isProjected: true }));
   }
 
   async findRecurringByDescription(description: string): Promise<Transaction | null> {
-    const key = this.normalizeKey(description);
+    const key = normalizeKey(description);
     const candidates = await this.repo.find({ where: { isRecurring: true } });
-    return candidates.find((t) => this.normalizeKey(t.description) === key) ?? null;
+    return candidates.find((t) => normalizeKey(t.description) === key) ?? null;
   }
 
   async updateCategory(id: number, categoryId: number) {

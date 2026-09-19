@@ -9,8 +9,8 @@ const PAID_THRESHOLD = 95;
 export class InsightsService {
   constructor(private readonly budgetsService: BudgetsService) {}
 
-  async getInsights(year?: number, month?: number) {
-    const statuses = await this.budgetsService.getBudgetStatus(year, month);
+  async getInsights(periodStart?: string) {
+    const statuses = await this.budgetsService.getBudgetStatus(periodStart);
     const insights: Array<{ id: number; type: 'success' | 'warning' | 'danger' | 'info'; message: string }> = [];
     let id = 1;
 

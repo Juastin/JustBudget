@@ -17,19 +17,13 @@ export class TransactionsController {
   constructor(private readonly service: TransactionsService) {}
 
   @Get()
-  findAll(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.findAll(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
+  findAll(@Query('periodStart') periodStart?: string) {
+    return this.service.findAll(periodStart);
   }
 
   @Get('recurring')
-  getRecurring(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.getRecurring(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
+  getRecurring(@Query('periodStart') periodStart?: string) {
+    return this.service.getRecurring(periodStart);
   }
 
   @Get('reservations')
@@ -38,11 +32,8 @@ export class TransactionsController {
   }
 
   @Get('projected')
-  getProjectedRecurring(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.getProjectedRecurring(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
+  getProjectedRecurring(@Query('periodStart') periodStart?: string) {
+    return this.service.getProjectedRecurring(periodStart);
   }
 
   @Put(':id/category')

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, ReservationsResult, Transaction } from '../types';
-import { formatEuro, currentPayPeriod, payPeriodLabel } from '../types';
+import { formatEuro, payPeriodLabel } from '../types';
 import { getBudgetStatus, getBudgetSummary } from '../services/budgetService';
 import { getQuickInsights } from '../services/savingsService';
 import { getRecurringTransactions, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
 import { getReservationsSummary } from '../services/reservationsService';
+import { usePeriod } from '../hooks/usePeriod';
 import KPICard from '../components/KPICard';
 import QuickInsightsList from '../components/QuickInsightsList';
 import ProgressBar from '../components/ProgressBar';
@@ -22,7 +23,7 @@ function loadSpotlight(): string[] {
 }
 
 export default function Overzicht() {
-  const [period, setPeriod] = useState(currentPayPeriod);
+  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [insights, setInsights] = useState<QuickInsight[]>([]);
   const [allStatuses, setAllStatuses] = useState<BudgetStatus[]>([]);
@@ -41,14 +42,15 @@ export default function Overzicht() {
   }, []);
 
   useEffect(() => {
+    if (!range) return;
     setLoading(true);
     setSummary(null);
     Promise.all([
-      getBudgetSummary(period.year, period.month),
-      getQuickInsights(period.year, period.month),
-      getBudgetStatus(period.year, period.month),
-      getRecurringTransactions(period.year, period.month),
-      getProjectedRecurring(period.year, period.month),
+      getBudgetSummary(range.start),
+      getQuickInsights(range.start),
+      getBudgetStatus(range.start),
+      getRecurringTransactions(range.start),
+      getProjectedRecurring(range.start),
     ])
       .then(([s, i, statuses, rec, proj]) => {
         setSummary(s);
@@ -58,7 +60,7 @@ export default function Overzicht() {
         setProjected(proj);
       })
       .finally(() => setLoading(false));
-  }, [period.year, period.month]);
+  }, [range?.start]);
 
   useEffect(() => {
     if (!editing) return;
@@ -99,7 +101,7 @@ export default function Overzicht() {
     const newPeriod = currentPeriod === 'monthly' ? 'yearly' : 'monthly';
     await setTransactionPeriod(id, newPeriod);
     const [newRec, newRes] = await Promise.all([
-      getRecurringTransactions(period.year, period.month),
+      getRecurringTransactions(range?.start),
       getYearlyReservations(),
     ]);
     setRecurring(newRec);
@@ -136,21 +138,26 @@ export default function Overzicht() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Overzicht</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {payPeriodLabel(period.year, period.month)}
+            {range ? payPeriodLabel(range.start, range.end) : ' '}
           </p>
         </div>
-        <PeriodSelector
-          year={period.year}
-          month={period.month}
-          onChange={(year, month) => setPeriod({ year, month })}
-        />
+        {range && (
+          <PeriodSelector
+            start={range.start}
+            end={range.end}
+            isCurrent={isCurrent}
+            onPrev={goPrev}
+            onNext={goNext}
+            onCurrent={goCurrent}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <KPICard
           label="Inkomen"
           value={summary ? formatEuro(summary.salary) : '—'}
-          subtitle={summary ? `Salaris t/m ${formatShort(summary.periodEnd)}` : undefined}
+          subtitle={summary ? (summary.periodEnd ? `Salaris t/m ${formatShort(summary.periodEnd)}` : 'Salaris deze periode') : undefined}
           variant="success"
         />
         <KPICard

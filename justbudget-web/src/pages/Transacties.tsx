@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Category, CategoryRule, Transaction } from '../types';
-import { currentPayPeriod, payPeriodLabel } from '../types';
+import { payPeriodLabel } from '../types';
 import { getTransactions, updateTransactionCategory, setTransactionRecurring } from '../services/transactionService';
 import { getCategories, getRules, createRule, deleteRule, applyRuleToAll } from '../services/categoryService';
+import { usePeriod } from '../hooks/usePeriod';
 import TransactionTable from '../components/TransactionTable';
 import CategorySelectModal from '../components/CategorySelectModal';
 import PdfImportModal from '../components/PdfImportModal';
@@ -11,7 +12,7 @@ import PeriodSelector from '../components/PeriodSelector';
 type Tab = 'transacties' | 'regels';
 
 export default function Transacties() {
-  const [period, setPeriod] = useState(currentPayPeriod);
+  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [rules, setRules] = useState<CategoryRule[]>([]);
@@ -26,15 +27,16 @@ export default function Transacties() {
   const [applyingRule, setApplyingRule] = useState(false);
 
   useEffect(() => {
+    if (!range) return;
     setLoading(true);
-    Promise.all([getTransactions(period.year, period.month), getCategories(), getRules()])
+    Promise.all([getTransactions(range.start), getCategories(), getRules()])
       .then(([t, c, r]) => {
         setTransactions(t);
         setCategories(c);
         setRules(r);
       })
       .finally(() => setLoading(false));
-  }, [period.year, period.month]);
+  }, [range?.start]);
 
   async function handleToggleRecurring(transaction: Transaction) {
     const updated = await setTransactionRecurring(transaction.id, !transaction.isRecurring);
@@ -84,7 +86,7 @@ export default function Transacties() {
     setApplyingRule(true);
     try {
       await applyRuleToAll(pendingApplyRule.id);
-      const updated = await getTransactions(period.year, period.month);
+      const updated = await getTransactions(range?.start);
       setTransactions(updated);
     } finally {
       setApplyingRule(false);
@@ -113,15 +115,20 @@ export default function Transacties() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transacties</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {payPeriodLabel(period.year, period.month)}
+            {range ? payPeriodLabel(range.start, range.end) : ' '}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <PeriodSelector
-            year={period.year}
-            month={period.month}
-            onChange={(year, month) => setPeriod({ year, month })}
-          />
+          {range && (
+            <PeriodSelector
+              start={range.start}
+              end={range.end}
+              isCurrent={isCurrent}
+              onPrev={goPrev}
+              onNext={goNext}
+              onCurrent={goCurrent}
+            />
+          )}
           <button
             onClick={() => setImportOpen(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
@@ -277,7 +284,7 @@ export default function Transacties() {
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={() => {
-          getTransactions(period.year, period.month).then(setTransactions);
+          getTransactions(range?.start).then(setTransactions);
         }}
       />
     </div>

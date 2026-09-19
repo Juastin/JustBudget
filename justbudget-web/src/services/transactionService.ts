@@ -11,20 +11,14 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function getTransactions(year?: number, month?: number): Promise<Transaction[]> {
-  const params = new URLSearchParams();
-  if (year !== undefined) params.set('year', String(year));
-  if (month !== undefined) params.set('month', String(month));
-  const query = params.toString();
-  return apiFetch<Transaction[]>(`api/transactions${query ? `?${query}` : ''}`);
+export function getTransactions(periodStart?: string): Promise<Transaction[]> {
+  const query = periodStart ? `?periodStart=${periodStart}` : '';
+  return apiFetch<Transaction[]>(`api/transactions${query}`);
 }
 
-export function getRecurringTransactions(year?: number, month?: number): Promise<RecurringResult> {
-  const params = new URLSearchParams();
-  if (year !== undefined) params.set('year', String(year));
-  if (month !== undefined) params.set('month', String(month));
-  const query = params.toString();
-  return apiFetch<RecurringResult>(`api/transactions/recurring${query ? `?${query}` : ''}`);
+export function getRecurringTransactions(periodStart?: string): Promise<RecurringResult> {
+  const query = periodStart ? `?periodStart=${periodStart}` : '';
+  return apiFetch<RecurringResult>(`api/transactions/recurring${query}`);
 }
 
 export function setTransactionRecurring(id: number, isRecurring: boolean, period?: 'monthly' | 'yearly'): Promise<Transaction> {
@@ -47,12 +41,9 @@ export function getYearlyReservations(): Promise<ReservationsResult> {
   return apiFetch<ReservationsResult>('api/transactions/reservations');
 }
 
-export function getProjectedRecurring(year?: number, month?: number): Promise<Transaction[]> {
-  const params = new URLSearchParams();
-  if (year !== undefined) params.set('year', String(year));
-  if (month !== undefined) params.set('month', String(month));
-  const query = params.toString();
-  return apiFetch<Transaction[]>(`api/transactions/projected${query ? `?${query}` : ''}`);
+export function getProjectedRecurring(periodStart?: string): Promise<Transaction[]> {
+  const query = periodStart ? `?periodStart=${periodStart}` : '';
+  return apiFetch<Transaction[]>(`api/transactions/projected${query}`);
 }
 
 export function updateTransactionCategory(

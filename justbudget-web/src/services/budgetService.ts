@@ -6,17 +6,16 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function periodParams(year?: number, month?: number): string {
-  if (year === undefined || month === undefined) return '';
-  return `?year=${year}&month=${month}`;
+function periodParams(periodStart?: string): string {
+  return periodStart ? `?periodStart=${periodStart}` : '';
 }
 
-export function getBudgetSummary(year?: number, month?: number): Promise<BudgetSummary> {
-  return apiFetch<BudgetSummary>(`api/budget-summary${periodParams(year, month)}`);
+export function getBudgetSummary(periodStart?: string): Promise<BudgetSummary> {
+  return apiFetch<BudgetSummary>(`api/budget-summary${periodParams(periodStart)}`);
 }
 
-export function getBudgetStatus(year?: number, month?: number): Promise<BudgetStatus[]> {
-  return apiFetch<BudgetStatus[]>(`api/budget-status${periodParams(year, month)}`);
+export function getBudgetStatus(periodStart?: string): Promise<BudgetStatus[]> {
+  return apiFetch<BudgetStatus[]>(`api/budget-status${periodParams(periodStart)}`);
 }
 
 export function getBudgets(): Promise<Budget[]> {

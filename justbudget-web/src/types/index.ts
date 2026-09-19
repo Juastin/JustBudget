@@ -41,7 +41,7 @@ export interface BudgetSummary {
   totalSpent: number;
   leftover: number;
   periodStart: string;
-  periodEnd: string;
+  periodEnd: string | null;
   latestTransactionDate: string | null;
   previousTotalSpent: number;
 }
@@ -104,6 +104,35 @@ export interface ReservationSummary {
   byCategory: ReservationCategory[];
 }
 
+export interface PeriodRange {
+  start: string;
+  end: string | null;
+}
+
+export type PeriodMode = 'FIXED_DAY' | 'TRANSACTION';
+
+export interface PeriodSettings {
+  mode: PeriodMode;
+  anchorDay: number;
+  triggerDescription: string | null;
+}
+
+export interface TriggerCandidate {
+  key: string;
+  description: string;
+  lastDate: string;
+  lastAmount: number;
+  count: number;
+}
+
+export interface PeriodInfo {
+  originalStart: string;
+  start: string;
+  end: string | null;
+  transactionCount: number;
+  hasAdjustment: boolean;
+}
+
 export type InsightType = 'success' | 'warning' | 'danger' | 'info';
 
 export interface QuickInsight {
@@ -124,19 +153,14 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function currentPayPeriod(): { year: number; month: number } {
-  const now = new Date();
-  if (now.getDate() >= 20) {
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
-  }
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return { year: prev.getFullYear(), month: prev.getMonth() + 1 };
+export function parseISODate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
-export function payPeriodLabel(year: number, month: number): string {
-  const start = new Date(year, month - 1, 20);
-  const end = new Date(year, month, 19);
-  const startStr = start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
-  const endStr = end.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+export function payPeriodLabel(start: string, end: string | null): string {
+  const startStr = parseISODate(start).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+  if (!end) return `${startStr} – heden`;
+  const endStr = parseISODate(end).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
   return `${startStr} – ${endStr}`;
 }

@@ -12,19 +12,13 @@ export class BudgetsController {
   }
 
   @Get('budget-status')
-  getStatus(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.getBudgetStatus(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
+  getStatus(@Query('periodStart') periodStart?: string) {
+    return this.service.getBudgetStatus(periodStart);
   }
 
   @Get('budget-summary')
-  getSummary(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.service.getBudgetSummary(
-      year ? parseInt(year, 10) : undefined,
-      month ? parseInt(month, 10) : undefined,
-    );
+  getSummary(@Query('periodStart') periodStart?: string) {
+    return this.service.getBudgetSummary(periodStart);
   }
 
   @Get('budget-averages')

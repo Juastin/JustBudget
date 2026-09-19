@@ -6,10 +6,7 @@ async function apiFetch<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function getQuickInsights(year?: number, month?: number): Promise<QuickInsight[]> {
-  const params = new URLSearchParams();
-  if (year !== undefined) params.set('year', String(year));
-  if (month !== undefined) params.set('month', String(month));
-  const query = params.toString();
-  return apiFetch<QuickInsight[]>(`api/insights${query ? `?${query}` : ''}`);
+export function getQuickInsights(periodStart?: string): Promise<QuickInsight[]> {
+  const query = periodStart ? `?periodStart=${periodStart}` : '';
+  return apiFetch<QuickInsight[]>(`api/insights${query}`);
 }

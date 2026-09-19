@@ -1,32 +1,19 @@
-import { currentPayPeriod, payPeriodLabel } from '../types';
+import { payPeriodLabel } from '../types';
 
 interface Props {
-  year: number;
-  month: number; // 1-indexed start month of pay period
-  onChange: (year: number, month: number) => void;
+  start: string;
+  end: string | null;
+  isCurrent: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onCurrent: () => void;
 }
 
-function prevPeriod(year: number, month: number) {
-  if (month === 1) return { year: year - 1, month: 12 };
-  return { year, month: month - 1 };
-}
-
-function nextPeriod(year: number, month: number) {
-  if (month === 12) return { year: year + 1, month: 1 };
-  return { year, month: month + 1 };
-}
-
-export default function PeriodSelector({ year, month, onChange }: Props) {
-  const current = currentPayPeriod();
-  const isCurrentPeriod = year === current.year && month === current.month;
-
-  const prev = prevPeriod(year, month);
-  const next = nextPeriod(year, month);
-
+export default function PeriodSelector({ start, end, isCurrent, onPrev, onNext, onCurrent }: Props) {
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => onChange(prev.year, prev.month)}
+        onClick={onPrev}
         className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors"
         title="Vorige periode"
       >
@@ -36,12 +23,12 @@ export default function PeriodSelector({ year, month, onChange }: Props) {
       </button>
 
       <span className="text-sm text-gray-600 dark:text-gray-300 min-w-[160px] text-center select-none">
-        {payPeriodLabel(year, month)}
+        {payPeriodLabel(start, end)}
       </span>
 
       <button
-        onClick={() => !isCurrentPeriod && onChange(next.year, next.month)}
-        disabled={isCurrentPeriod}
+        onClick={() => !isCurrent && onNext()}
+        disabled={isCurrent}
         className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         title="Volgende periode"
       >
@@ -50,9 +37,9 @@ export default function PeriodSelector({ year, month, onChange }: Props) {
         </svg>
       </button>
 
-      {!isCurrentPeriod && (
+      {!isCurrent && (
         <button
-          onClick={() => onChange(current.year, current.month)}
+          onClick={onCurrent}
           className="ml-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
         >
           Huidig

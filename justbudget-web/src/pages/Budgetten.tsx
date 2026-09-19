@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { BudgetAverage, BudgetStatus } from '../types';
-import { formatEuro, currentPayPeriod, payPeriodLabel } from '../types';
+import { formatEuro, payPeriodLabel } from '../types';
 import { getBudgetAverages, getBudgetStatus, updateBudget } from '../services/budgetService';
 import { createCategory, deleteCategory, updateCategory } from '../services/categoryService';
+import { usePeriod } from '../hooks/usePeriod';
 import BudgetCard from '../components/BudgetCard';
 import BudgetEditModal from '../components/BudgetEditModal';
 import CategoryCreateModal from '../components/CategoryCreateModal';
 import PeriodSelector from '../components/PeriodSelector';
 
 export default function Budgetten() {
-  const [period, setPeriod] = useState(currentPayPeriod);
+  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
   const [statuses, setStatuses] = useState<BudgetStatus[]>([]);
   const [averages, setAverages] = useState<BudgetAverage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,11 +18,12 @@ export default function Budgetten() {
   const [createOpen, setCreateOpen] = useState(false);
 
   async function load() {
+    if (!range) return;
     setLoading(true);
     try {
       const [data, avg] = await Promise.all([
-        getBudgetStatus(period.year, period.month),
-        getBudgetAverages(period.year),
+        getBudgetStatus(range.start),
+        getBudgetAverages(Number(range.start.slice(0, 4))),
       ]);
       setStatuses(data);
       setAverages(avg);
@@ -30,7 +32,7 @@ export default function Budgetten() {
     }
   }
 
-  useEffect(() => { load(); }, [period.year, period.month]);
+  useEffect(() => { load(); }, [range?.start]);
 
   const averageByCategory = new Map(averages.map((a) => [a.categoryId, a]));
 
@@ -40,7 +42,7 @@ export default function Budgetten() {
       updateBudget(budgetId, { amount, notifyPaid, warnThreshold }),
       status && name !== status.category ? updateCategory(status.categoryId, { name }) : Promise.resolve(),
     ]);
-    const updated = await getBudgetStatus(period.year, period.month);
+    const updated = await getBudgetStatus(range?.start);
     setStatuses(updated);
   }
 
@@ -85,15 +87,20 @@ export default function Budgetten() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Budgetten</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {payPeriodLabel(period.year, period.month)}
+            {range ? payPeriodLabel(range.start, range.end) : ' '}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <PeriodSelector
-            year={period.year}
-            month={period.month}
-            onChange={(year, month) => setPeriod({ year, month })}
-          />
+          {range && (
+            <PeriodSelector
+              start={range.start}
+              end={range.end}
+              isCurrent={isCurrent}
+              onPrev={goPrev}
+              onNext={goNext}
+              onCurrent={goCurrent}
+            />
+          )}
           <button
             onClick={() => setCreateOpen(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
