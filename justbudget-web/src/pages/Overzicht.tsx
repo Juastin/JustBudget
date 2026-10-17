@@ -1,26 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, ReservationsResult, Transaction } from '../types';
+import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, QuickInsightOptions, ReservationsResult, Transaction } from '../types';
 import { formatEuro, payPeriodLabel } from '../types';
 import { getBudgetStatus, getBudgetSummary } from '../services/budgetService';
 import { getQuickInsights } from '../services/savingsService';
 import { getRecurringTransactions, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
 import { getReservationsSummary } from '../services/reservationsService';
+import { getUiSettings, updateUiSettings } from '../services/uiSettingsService';
 import { usePeriod } from '../hooks/usePeriod';
 import KPICard from '../components/KPICard';
 import QuickInsightsList from '../components/QuickInsightsList';
 import ProgressBar from '../components/ProgressBar';
 import PeriodSelector from '../components/PeriodSelector';
 
-const STORAGE_KEY = 'topUitgavenCategories';
 const DEFAULT_SPOTLIGHT = ['Uit eten', 'Boodschappen'];
-
-function loadSpotlight(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return DEFAULT_SPOTLIGHT;
-}
+const DEFAULT_INSIGHT_OPTIONS: QuickInsightOptions = {
+  overBudgetCategories: true,
+  warnThreshold: true,
+  paidNotifications: true,
+  totalUnderBudget: true,
+  totalOverBudget: true,
+};
+const INSIGHT_OPTION_LABELS: { key: keyof QuickInsightOptions; label: string }[] = [
+  { key: 'overBudgetCategories', label: 'Categorieën die over budget zijn' },
+  { key: 'warnThreshold', label: 'Waarschuwingen bij drempelpercentage' },
+  { key: 'paidNotifications', label: 'Meldingen als categorie betaald is' },
+  { key: 'totalUnderBudget', label: 'Totaal niet uitgegeven van budget' },
+  { key: 'totalOverBudget', label: 'Totaal over budget uitgegeven' },
+];
 
 export default function Overzicht() {
   const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
@@ -32,13 +38,20 @@ export default function Overzicht() {
   const [reservations, setReservations] = useState<ReservationsResult>({ transactions: [], totalMonthlyReservation: 0 });
   const [reservationsSummary, setReservationsSummary] = useState<ReservationSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [spotlightCategories, setSpotlightCategories] = useState<string[]>(loadSpotlight);
+  const [spotlightCategories, setSpotlightCategories] = useState<string[]>(DEFAULT_SPOTLIGHT);
   const [editing, setEditing] = useState(false);
   const editRef = useRef<HTMLDivElement>(null);
+  const [insightOptions, setInsightOptions] = useState<QuickInsightOptions>(DEFAULT_INSIGHT_OPTIONS);
+  const [editingInsights, setEditingInsights] = useState(false);
+  const insightsEditRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getReservationsSummary().then(setReservationsSummary).catch(() => {});
     getYearlyReservations().then(setReservations).catch(() => {});
+    getUiSettings().then((s) => {
+      setSpotlightCategories(s.spotlightCategories);
+      setInsightOptions(s.insightOptions);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -73,12 +86,29 @@ export default function Overzicht() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [editing]);
 
+  useEffect(() => {
+    if (!editingInsights) return;
+    function handleClick(e: MouseEvent) {
+      if (insightsEditRef.current && !insightsEditRef.current.contains(e.target as Node)) {
+        setEditingInsights(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [editingInsights]);
+
   function toggleCategory(name: string) {
     const next = spotlightCategories.includes(name)
       ? spotlightCategories.filter((c) => c !== name)
       : [...spotlightCategories, name];
     setSpotlightCategories(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    updateUiSettings({ spotlightCategories: next }).catch(() => {});
+  }
+
+  function toggleInsightOption(key: keyof QuickInsightOptions) {
+    const next = { ...insightOptions, [key]: !insightOptions[key] };
+    setInsightOptions(next);
+    updateUiSettings({ insightOptions: next }).catch(() => {});
   }
 
   const spotlightStatuses = allStatuses
@@ -90,6 +120,37 @@ export default function Overzicht() {
   const overBudgetTotal = allStatuses
     .filter((s) => s.category !== 'Salaris' && s.category !== 'Overboekingen')
     .reduce((s, b) => s + (b.spent < 0 ? b.spent : Math.max(0, b.spent - b.budget)), 0);
+
+  const budgetCategoryStatuses = allStatuses.filter((s) => s.category !== 'Salaris' && s.category !== 'Overboekingen' && s.budget > 0);
+  const underBudgetTotal = budgetCategoryStatuses
+    .filter((s) => !s.overBudget)
+    .reduce((sum, s) => sum + s.remaining, 0);
+  const overBudgetInsightTotal = budgetCategoryStatuses
+    .filter((s) => s.overBudget)
+    .reduce((sum, s) => sum + Math.abs(s.remaining), 0);
+
+  const aggregateInsights: QuickInsight[] = [];
+  if (insightOptions.totalUnderBudget && underBudgetTotal > 0) {
+    aggregateInsights.push({
+      id: -1,
+      type: 'success',
+      message: `In totaal ${formatEuro(underBudgetTotal)} niet uitgegeven van het budget (excl. categorieën over budget)`,
+    });
+  }
+  if (insightOptions.totalOverBudget && overBudgetInsightTotal > 0) {
+    aggregateInsights.push({
+      id: -2,
+      type: 'danger',
+      message: `In totaal ${formatEuro(overBudgetInsightTotal)} meer uitgegeven dan gebudgetteerd`,
+    });
+  }
+  const filteredInsights = insights.filter((i) => {
+    if (i.type === 'danger') return insightOptions.overBudgetCategories;
+    if (i.type === 'warning') return insightOptions.warnThreshold;
+    if (i.type === 'success') return insightOptions.paidNotifications;
+    return true;
+  });
+  const combinedInsights = [...aggregateInsights, ...filteredInsights];
 
   async function handleToggleRecurring(id: number) {
     await setTransactionRecurring(id, false);
@@ -215,8 +276,36 @@ export default function Overzicht() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Snelle inzichten</h2>
-          <QuickInsightsList insights={insights} />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Snelle inzichten</h2>
+            <div className="relative" ref={insightsEditRef}>
+              <button
+                onClick={() => setEditingInsights((v) => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                Bewerken
+              </button>
+              {editingInsights && (
+                <div className="absolute right-0 top-6 z-10 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg p-3 min-w-64">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Inzichten tonen</p>
+                  <div className="space-y-1.5">
+                    {INSIGHT_OPTION_LABELS.map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={insightOptions[key]}
+                          onChange={() => toggleInsightOption(key)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <QuickInsightsList insights={combinedInsights} />
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">

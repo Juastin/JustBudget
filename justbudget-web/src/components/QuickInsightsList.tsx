@@ -57,6 +57,10 @@ function Icon({ type }: { type: QuickInsight['type'] }) {
 }
 
 export default function QuickInsightsList({ insights }: Props) {
+  if (insights.length === 0) {
+    return <p className="text-sm text-gray-400 dark:text-gray-500">Geen inzichten beschikbaar</p>;
+  }
+
   return (
     <div className="space-y-2">
       {insights.map((insight) => {

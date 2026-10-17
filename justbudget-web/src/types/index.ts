@@ -144,6 +144,14 @@ export interface QuickInsight {
   message: string;
 }
 
+export interface QuickInsightOptions {
+  overBudgetCategories: boolean;
+  warnThreshold: boolean;
+  paidNotifications: boolean;
+  totalUnderBudget: boolean;
+  totalOverBudget: boolean;
+}
+
 export function formatEuro(amount: number): string {
   return amount.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' });
 }

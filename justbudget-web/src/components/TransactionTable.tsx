@@ -12,6 +12,11 @@ interface Props {
   onUnlink?: (transaction: Transaction) => void;
 }
 
+function netAmount(t: Transaction): number {
+  if (t.reimbursedTotal == null) return t.amount;
+  return Math.round((t.amount + t.reimbursedTotal) * 100) / 100;
+}
+
 function groupReimbursements(reimbursements: Transaction[]) {
   const map = new Map<number, number>();
   reimbursements.forEach((r) => {
@@ -142,8 +147,15 @@ export default function TransactionTable({ transactions, categories, onChangeCat
                       );
                     })()}
                   </td>
-                  <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${t.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {formatEuro(t.amount)}
+                  <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${netAmount(t) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {t.reimbursedTotal != null ? (
+                      <span className="inline-flex items-baseline gap-1.5">
+                        <span className="font-normal text-gray-400 dark:text-gray-500 line-through">{formatEuro(t.amount)}</span>
+                        <span>{formatEuro(netAmount(t))}</span>
+                      </span>
+                    ) : (
+                      formatEuro(t.amount)
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {t.categoryName ? (
