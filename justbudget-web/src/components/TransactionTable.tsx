@@ -6,6 +6,7 @@ import CategoryBadge from './CategoryBadge';
 interface Props {
   transactions: Transaction[];
   categories: Category[];
+  initialCategoryId?: string | null;
   onChangeCategory: (transaction: Transaction) => void;
   onToggleRecurring?: (transaction: Transaction) => void;
   onLink?: (transaction: Transaction) => void;
@@ -28,9 +29,9 @@ function groupReimbursements(reimbursements: Transaction[]) {
     .sort((a, b) => b.count - a.count);
 }
 
-export default function TransactionTable({ transactions, categories, onChangeCategory, onToggleRecurring, onLink, onUnlink }: Props) {
+export default function TransactionTable({ transactions, categories, initialCategoryId, onChangeCategory, onToggleRecurring, onLink, onUnlink }: Props) {
   const [search, setSearch] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId ?? '');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   function toggleExpanded(id: number) {

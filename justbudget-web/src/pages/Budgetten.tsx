@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { BudgetAverage, BudgetStatus } from '../types';
 import { formatEuro, payPeriodLabel } from '../types';
 import { getBudgetAverages, getBudgetStatus, updateBudget } from '../services/budgetService';
 import { createCategory, deleteCategory, updateCategory } from '../services/categoryService';
-import { usePeriod } from '../hooks/usePeriod';
+import { usePeriodContext } from '../context/PeriodContext';
 import BudgetCard from '../components/BudgetCard';
 import BudgetEditModal from '../components/BudgetEditModal';
 import CategoryCreateModal from '../components/CategoryCreateModal';
 import PeriodSelector from '../components/PeriodSelector';
 
 export default function Budgetten() {
-  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
+  const navigate = useNavigate();
+  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriodContext();
   const [statuses, setStatuses] = useState<BudgetStatus[]>([]);
   const [averages, setAverages] = useState<BudgetAverage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,10 @@ export default function Budgetten() {
 
   function handleEdit(budgetId: number) {
     setEditingStatus(statuses.find((s) => s.budgetId === budgetId) ?? null);
+  }
+
+  function handleViewTransactions(categoryId: number) {
+    navigate(`/transacties?categoryId=${categoryId}`);
   }
 
   async function handleCreate(name: string, color: string, budgetAmount: number) {
@@ -163,6 +169,7 @@ export default function Budgetten() {
               average={averageByCategory.get(s.categoryId) ?? null}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onViewTransactions={handleViewTransactions}
             />
           ))}
         </div>

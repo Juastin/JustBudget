@@ -8,9 +8,10 @@ interface Props {
   average?: BudgetAverage | null;
   onEdit: (budgetId: number) => void;
   onDelete: (categoryId: number) => void;
+  onViewTransactions: (categoryId: number) => void;
 }
 
-export default function BudgetCard({ status, average, onEdit, onDelete }: Props) {
+export default function BudgetCard({ status, average, onEdit, onDelete, onViewTransactions }: Props) {
   const [confirming, setConfirming] = useState(false);
 
   // Gap between the yearly average and the budget, as a % of the budget's size.
@@ -48,10 +49,14 @@ export default function BudgetCard({ status, average, onEdit, onDelete }: Props)
   }
 
   return (
-    <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+    <div
+      onClick={() => onViewTransactions(status.categoryId)}
+      title="Bekijk transacties voor deze categorie"
+      className="relative bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 cursor-pointer hover:ring-2 hover:ring-blue-500/40 transition-shadow"
+    >
       <div className="absolute top-4 right-4 flex gap-1">
         <button
-          onClick={() => onEdit(status.budgetId)}
+          onClick={(e) => { e.stopPropagation(); onEdit(status.budgetId); }}
           className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Budget bewerken"
         >
@@ -60,7 +65,7 @@ export default function BudgetCard({ status, average, onEdit, onDelete }: Props)
           </svg>
         </button>
         <button
-          onClick={() => setConfirming(true)}
+          onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
           className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Categorie verwijderen"
         >

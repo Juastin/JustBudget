@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { Category, CategoryRule, Transaction } from '../types';
 import { payPeriodLabel } from '../types';
 import { getTransactions, updateTransactionCategory, setTransactionRecurring, linkTransaction, unlinkTransaction } from '../services/transactionService';
 import { getCategories, getRules, createRule, deleteRule, applyRuleToAll } from '../services/categoryService';
-import { usePeriod } from '../hooks/usePeriod';
+import { usePeriodContext } from '../context/PeriodContext';
 import TransactionTable from '../components/TransactionTable';
 import CategorySelectModal from '../components/CategorySelectModal';
 import LinkExpenseModal from '../components/LinkExpenseModal';
@@ -13,7 +14,10 @@ import PeriodSelector from '../components/PeriodSelector';
 type Tab = 'transacties' | 'regels';
 
 export default function Transacties() {
-  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriod();
+  const [searchParams] = useSearchParams();
+  const initialCategoryId = searchParams.get('categoryId');
+
+  const { range, isCurrent, goPrev, goNext, goCurrent } = usePeriodContext();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [rules, setRules] = useState<CategoryRule[]>([]);
@@ -177,6 +181,7 @@ export default function Transacties() {
         <TransactionTable
           transactions={transactions}
           categories={categories}
+          initialCategoryId={initialCategoryId}
           onChangeCategory={setSelectedTransaction}
           onToggleRecurring={handleToggleRecurring}
           onLink={setLinkingTransaction}
