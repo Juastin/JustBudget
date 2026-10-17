@@ -214,7 +214,7 @@ export default function Overzicht() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <KPICard
           label="Inkomen"
           value={summary ? formatEuro(summary.salary) : '—'}
@@ -256,37 +256,15 @@ export default function Overzicht() {
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
           if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
 
-          const actueelSaldo = summary
-            ? summary.salary - summary.totalSpent - reservatieAmt - jaarresAmt
-            : 0;
-          const verschil = actueelSaldo - verwachtSaldo;
-
           return (
-            <>
-              <KPICard
-                label="Verwacht saldo einde maand"
-                value={summary ? formatEuro(verwachtSaldo) : '—'}
-                variant={summary ? (verwachtSaldo < 0 ? 'danger' : 'info') : 'info'}
-                subtitleNode={summary && parts.length > 0 ? (
-                  <span className="text-gray-400 dark:text-gray-500">incl. {parts.join(' + ')}</span>
-                ) : undefined}
-              />
-              <KPICard
-                label="Saldo nu (na reserveringen)"
-                value={summary ? formatEuro(actueelSaldo) : '—'}
-                variant={summary ? (actueelSaldo < 0 ? 'danger' : 'success') : 'info'}
-                subtitleNode={summary ? (
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-gray-400 dark:text-gray-500">o.b.v. werkelijk uitgegeven, excl. budgetaanname</span>
-                    {Math.abs(verschil) >= 0.01 && (
-                      <span className={verschil > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
-                        {verschil > 0 ? '▲' : '▼'} {formatEuro(Math.abs(verschil))} t.o.v. verwacht
-                      </span>
-                    )}
-                  </span>
-                ) : undefined}
-              />
-            </>
+            <KPICard
+              label="Verwacht saldo einde maand"
+              value={summary ? formatEuro(verwachtSaldo) : '—'}
+              variant={summary ? (verwachtSaldo < 0 ? 'danger' : 'info') : 'info'}
+              subtitleNode={summary && parts.length > 0 ? (
+                <span className="text-gray-400 dark:text-gray-500">incl. {parts.join(' + ')}</span>
+              ) : undefined}
+            />
           );
         })()}
       </div>
