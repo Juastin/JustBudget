@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Category } from './category.entity';
 
 @Entity('transactions')
@@ -30,6 +30,17 @@ export class Transaction {
   @CreateDateColumn()
   createdAt: Date;
 
+  @Column({ nullable: true })
+  linkedExpenseId: number | null;
+
   @ManyToOne(() => Category, (c) => c.transactions, { nullable: true, onDelete: 'SET NULL' })
   category: Category;
+
+  // Self-reference: a positive transaction (e.g. a Tikkie reimbursement) can be
+  // linked to the expense it pays back, so budgets net the two out.
+  @ManyToOne(() => Transaction, (t) => t.reimbursements, { nullable: true, onDelete: 'SET NULL' })
+  linkedExpense: Transaction | null;
+
+  @OneToMany(() => Transaction, (t) => t.linkedExpense)
+  reimbursements: Transaction[];
 }

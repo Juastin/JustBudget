@@ -89,7 +89,7 @@ export default function Overzicht() {
   const displayTotalSpent = summary ? summary.totalSpent + projectedTotal : 0;
   const overBudgetTotal = allStatuses
     .filter((s) => s.category !== 'Salaris' && s.category !== 'Overboekingen')
-    .reduce((s, b) => s + Math.max(0, b.spent - b.budget), 0);
+    .reduce((s, b) => s + (b.spent < 0 ? b.spent : Math.max(0, b.spent - b.budget)), 0);
 
   async function handleToggleRecurring(id: number) {
     await setTransactionRecurring(id, false);

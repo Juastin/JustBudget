@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from '../entities/transaction.entity';
@@ -15,6 +15,9 @@ export class TransactionsService {
   ) {}
 
   private shape(t: Transaction) {
+    const reimbursedTotal = t.reimbursements && t.reimbursements.length > 0
+      ? Math.round(t.reimbursements.reduce((s, r) => s + Number(r.amount), 0) * 100) / 100
+      : undefined;
     return {
       id: t.id,
       description: t.description,
@@ -26,11 +29,26 @@ export class TransactionsService {
       categoryId: t.categoryId ?? undefined,
       categoryName: t.category?.name ?? undefined,
       color: t.category?.color ?? undefined,
+      linkedExpenseId: t.linkedExpenseId ?? undefined,
+      linkedExpenseDescription: t.linkedExpense?.description ?? undefined,
+      reimbursedTotal,
     };
   }
 
+  private async findOneShaped(id: number) {
+    const tx = await this.repo.findOne({
+      where: { id },
+      relations: ['category', 'linkedExpense', 'reimbursements'],
+    });
+    if (!tx) throw new NotFoundException('Transactie niet gevonden');
+    return this.shape(tx);
+  }
+
   async findAll(periodStart?: string) {
-    const qb = this.repo.createQueryBuilder('t').leftJoinAndSelect('t.category', 'category');
+    const qb = this.repo.createQueryBuilder('t')
+      .leftJoinAndSelect('t.category', 'category')
+      .leftJoinAndSelect('t.linkedExpense', 'linkedExpense')
+      .leftJoinAndSelect('t.reimbursements', 'reimbursements');
 
     const { start, end } = await this.periodsService.getPeriod(periodStart);
     qb.where('t.transactionDate >= :start', { start });
@@ -137,5 +155,28 @@ export class TransactionsService {
     tx.category = cat;
     const saved = await this.repo.save(tx);
     return this.shape(saved);
+  }
+
+  async linkToExpense(id: number, expenseId: number) {
+    if (id === expenseId) throw new BadRequestException('Een transactie kan niet aan zichzelf gekoppeld worden');
+    const tx = await this.repo.findOneBy({ id });
+    if (!tx) throw new NotFoundException('Transactie niet gevonden');
+    if (Number(tx.amount) <= 0) throw new BadRequestException('Alleen een ontvangen bedrag kan gekoppeld worden aan een uitgave');
+
+    const expense = await this.repo.findOneBy({ id: expenseId });
+    if (!expense) throw new NotFoundException('Uitgave niet gevonden');
+    if (Number(expense.amount) >= 0) throw new BadRequestException('De gekoppelde transactie moet een uitgave zijn');
+
+    tx.linkedExpenseId = expenseId;
+    await this.repo.save(tx);
+    return this.findOneShaped(id);
+  }
+
+  async unlink(id: number) {
+    const tx = await this.repo.findOneBy({ id });
+    if (!tx) throw new NotFoundException('Transactie niet gevonden');
+    tx.linkedExpenseId = null;
+    await this.repo.save(tx);
+    return this.findOneShaped(id);
   }
 }

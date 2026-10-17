@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Category, CategoryRule, Transaction } from '../types';
 import { payPeriodLabel } from '../types';
-import { getTransactions, updateTransactionCategory, setTransactionRecurring } from '../services/transactionService';
+import { getTransactions, updateTransactionCategory, setTransactionRecurring, linkTransaction, unlinkTransaction } from '../services/transactionService';
 import { getCategories, getRules, createRule, deleteRule, applyRuleToAll } from '../services/categoryService';
 import { usePeriod } from '../hooks/usePeriod';
 import TransactionTable from '../components/TransactionTable';
 import CategorySelectModal from '../components/CategorySelectModal';
+import LinkExpenseModal from '../components/LinkExpenseModal';
 import PdfImportModal from '../components/PdfImportModal';
 import PeriodSelector from '../components/PeriodSelector';
 
@@ -19,6 +20,7 @@ export default function Transacties() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('transacties');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   const [newKeyword, setNewKeyword] = useState('');
@@ -41,6 +43,18 @@ export default function Transacties() {
   async function handleToggleRecurring(transaction: Transaction) {
     const updated = await setTransactionRecurring(transaction.id, !transaction.isRecurring);
     setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  }
+
+  async function handleLink(transactionId: number, expenseId: number) {
+    await linkTransaction(transactionId, expenseId);
+    const updated = await getTransactions(range?.start);
+    setTransactions(updated);
+  }
+
+  async function handleUnlink(transaction: Transaction) {
+    await unlinkTransaction(transaction.id);
+    const updated = await getTransactions(range?.start);
+    setTransactions(updated);
   }
 
   async function handleCategorySave(transactionId: number, categoryId: number, shouldCreateRule: boolean) {
@@ -111,14 +125,14 @@ export default function Transacties() {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transacties</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {range ? payPeriodLabel(range.start, range.end) : ' '}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {range && (
             <PeriodSelector
               start={range.start}
@@ -165,6 +179,8 @@ export default function Transacties() {
           categories={categories}
           onChangeCategory={setSelectedTransaction}
           onToggleRecurring={handleToggleRecurring}
+          onLink={setLinkingTransaction}
+          onUnlink={handleUnlink}
         />
       )}
 
@@ -278,6 +294,14 @@ export default function Transacties() {
         categories={categories}
         onClose={() => setSelectedTransaction(null)}
         onSave={handleCategorySave}
+      />
+
+      <LinkExpenseModal
+        isOpen={linkingTransaction !== null}
+        transaction={linkingTransaction}
+        expenses={transactions.filter((t) => t.amount < 0)}
+        onClose={() => setLinkingTransaction(null)}
+        onLink={handleLink}
       />
 
       <PdfImportModal

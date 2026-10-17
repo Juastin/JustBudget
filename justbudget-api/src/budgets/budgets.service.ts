@@ -54,11 +54,23 @@ export class BudgetsService {
           .createQueryBuilder('t')
           .select('SUM(t.amount)', 'total')
           .where('t.categoryId = :cid', { cid: b.categoryId })
+          .andWhere('t.linkedExpenseId IS NULL')
           .andWhere('t.transactionDate >= :start', { start });
         if (end) rowsQb.andWhere('t.transactionDate <= :end', { end });
         const rows = await rowsQb.getRawOne<{ total: string | null }>();
 
-        const spent = -Number(rows?.total ?? 0);
+        // Reimbursements (e.g. Tikkies) are attributed to the category/period of the
+        // expense they're linked to, regardless of their own category or date.
+        const reimbQb = this.txRepo
+          .createQueryBuilder('t')
+          .innerJoin('t.linkedExpense', 'le')
+          .select('SUM(t.amount)', 'total')
+          .where('le.categoryId = :cid', { cid: b.categoryId })
+          .andWhere('le.transactionDate >= :start', { start });
+        if (end) reimbQb.andWhere('le.transactionDate <= :end', { end });
+        const reimbRow = await reimbQb.getRawOne<{ total: string | null }>();
+
+        const spent = -(Number(rows?.total ?? 0) + Number(reimbRow?.total ?? 0));
         const budget = Number(b.amount);
         const remaining = budget - spent;
         const percentage = budget !== 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
@@ -116,7 +128,20 @@ export class BudgetsService {
       spentQb.andWhere('(t.categoryId != :ocid OR t.categoryId IS NULL)', { ocid: overboekingCategory.id });
     }
     const spentRow = await spentQb.getRawOne<{ total: string | null }>();
-    const totalSpent = -Number(spentRow?.total ?? 0);
+
+    const reimbQb = this.txRepo
+      .createQueryBuilder('t')
+      .innerJoin('t.linkedExpense', 'le')
+      .select('SUM(t.amount)', 'total')
+      .where('le.transactionDate >= :start', { start })
+      .andWhere('le.amount < 0');
+    if (end) reimbQb.andWhere('le.transactionDate <= :end', { end });
+    if (overboekingCategory) {
+      reimbQb.andWhere('(le.categoryId != :ocid OR le.categoryId IS NULL)', { ocid: overboekingCategory.id });
+    }
+    const reimbRow = await reimbQb.getRawOne<{ total: string | null }>();
+
+    const totalSpent = -Number(spentRow?.total ?? 0) - Number(reimbRow?.total ?? 0);
 
     const budgets = await this.budgetRepo.find();
     const totalBudget = budgets.reduce((s, b) => s + Number(b.amount), 0);

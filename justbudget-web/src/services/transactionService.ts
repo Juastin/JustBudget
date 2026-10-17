@@ -46,6 +46,18 @@ export function getProjectedRecurring(periodStart?: string): Promise<Transaction
   return apiFetch<Transaction[]>(`api/transactions/projected${query}`);
 }
 
+export function linkTransaction(id: number, expenseId: number): Promise<Transaction> {
+  return apiFetch<Transaction>(`api/transactions/${id}/link`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expenseId }),
+  });
+}
+
+export function unlinkTransaction(id: number): Promise<Transaction> {
+  return apiFetch<Transaction>(`api/transactions/${id}/unlink`, { method: 'PATCH' });
+}
+
 export function updateTransactionCategory(
   id: number,
   categoryId: number,

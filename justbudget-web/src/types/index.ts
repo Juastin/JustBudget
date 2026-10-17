@@ -58,6 +58,9 @@ export interface Transaction {
   isRecurring?: boolean;
   recurringPeriod?: 'monthly' | 'yearly';
   isProjected?: boolean;
+  linkedExpenseId?: number;
+  linkedExpenseDescription?: string;
+  reimbursedTotal?: number;
 }
 
 export interface ReservationTransaction extends Transaction {

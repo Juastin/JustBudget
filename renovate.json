@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "timezone": "Europe/Amsterdam",
+  "schedule": ["before 6am on monday"],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 1,
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["^.*"],
+      "groupName": "all dependencies",
+      "groupSlug": "all-deps",
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "groupName": "all dependencies"
+  }
+}
