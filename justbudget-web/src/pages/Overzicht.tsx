@@ -214,7 +214,7 @@ export default function Overzicht() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <KPICard
           label="Inkomen"
           value={summary ? formatEuro(summary.salary) : '—'}
@@ -263,6 +263,29 @@ export default function Overzicht() {
               variant={summary ? (verwachtSaldo < 0 ? 'danger' : 'info') : 'info'}
               subtitleNode={summary && parts.length > 0 ? (
                 <span className="text-gray-400 dark:text-gray-500">incl. {parts.join(' + ')}</span>
+              ) : undefined}
+            />
+          );
+        })()}
+        {(() => {
+          const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
+          const jaarresAmt = reservations.totalMonthlyReservation;
+          const nogTeBesteden = summary
+            ? summary.salary - reservatieAmt - jaarresAmt - displayTotalSpent
+            : 0;
+          const parts: string[] = [];
+          if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
+          if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
+
+          return (
+            <KPICard
+              label="Nog te besteden deze maand"
+              value={summary ? formatEuro(nogTeBesteden) : '—'}
+              variant={summary ? (nogTeBesteden < 0 ? 'danger' : 'success') : 'default'}
+              subtitleNode={summary ? (
+                <span className="text-gray-400 dark:text-gray-500">
+                  inkomen − {parts.length > 0 ? `${parts.join(' − ')} − ` : ''}uitgegeven
+                </span>
               ) : undefined}
             />
           );

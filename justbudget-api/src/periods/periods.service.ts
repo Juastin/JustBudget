@@ -2,11 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PeriodSettings } from '../entities/period-settings.entity';
-import { PeriodOverride } from '../entities/period-override.entity';
+import { PeriodBoundary } from '../entities/period-boundary.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { normalizeKey } from '../common/normalize-key';
 import { UpdatePeriodSettingsDto } from './dto/update-period-settings.dto';
-import { UpdatePeriodOverrideDto } from './dto/update-period-override.dto';
 
 export interface PeriodRange {
   start: string;
@@ -22,11 +21,9 @@ export interface TriggerCandidate {
 }
 
 export interface PeriodInfo {
-  originalStart: string;
   start: string;
   end: string | null;
   transactionCount: number;
-  hasAdjustment: boolean;
 }
 
 function fmt(y: number, month0: number, d: number): string {
@@ -74,7 +71,7 @@ function fixedDayAdjacent(anchorDay: number, periodStart: string, direction: 'pr
 export class PeriodsService {
   constructor(
     @InjectRepository(PeriodSettings) private readonly settingsRepo: Repository<PeriodSettings>,
-    @InjectRepository(PeriodOverride) private readonly overrideRepo: Repository<PeriodOverride>,
+    @InjectRepository(PeriodBoundary) private readonly boundaryRepo: Repository<PeriodBoundary>,
     @InjectRepository(Transaction) private readonly txRepo: Repository<Transaction>,
   ) {}
 
@@ -145,269 +142,203 @@ export class PeriodsService {
     return Array.from(new Set(dates)).sort();
   }
 
-  private periodRangeForTriggerIndex(triggerDates: string[], idx: number): PeriodRange {
-    const start = triggerDates[idx];
-    if (idx + 1 < triggerDates.length) {
-      return { start, end: addDays(triggerDates[idx + 1], -1) };
+  // The computed (settings-driven) period starts covering a date range, ignoring any manual boundaries.
+  // Used only to seed the boundary table and to extend it forward over time.
+  private async computedPeriodStartsInYear(year: number): Promise<string[]> {
+    const settings = await this.getSettings();
+
+    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
+      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
+      if (triggerDates.length > 0) {
+        return triggerDates.filter((d) => d.startsWith(String(year)));
+      }
     }
-    return { start, end: null };
+
+    const starts: string[] = [];
+    for (let month0 = 0; month0 < 12; month0++) {
+      starts.push(fixedDayPeriodFromStart(year, month0, settings.anchorDay).start);
+    }
+    return starts;
   }
 
-  private transactionPeriodContaining(triggerDates: string[], anchorDay: number, reference: string): PeriodRange {
+  private async computeNextBoundaryAfter(after: string): Promise<string | null> {
+    const settings = await this.getSettings();
+    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
+      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
+      const future = triggerDates.filter((d) => d > after);
+      return future.length > 0 ? future[0] : null;
+    }
+    return fixedDayAdjacent(settings.anchorDay, after, 'next').start;
+  }
+
+  private async ensureSeeded(): Promise<void> {
+    const count = await this.boundaryRepo.count();
+    if (count > 0) return;
+
+    const firstTx = await this.txRepo.find({
+      select: ['transactionDate'],
+      order: { transactionDate: 'ASC' },
+      take: 1,
+    });
+    if (firstTx.length === 0) return;
+
+    const settings = await this.getSettings();
+    const earliest = firstTx[0].transactionDate;
+    const today = todayStr();
+
+    let starts: string[];
+    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
+      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
+      starts = [...triggerDates];
+      if (starts.length === 0 || starts[0] > earliest) {
+        starts.unshift(fixedDayPeriodContaining(settings.anchorDay, earliest).start);
+      }
+    } else {
+      starts = [fixedDayPeriodContaining(settings.anchorDay, earliest).start];
+    }
+
+    const maxYear = Math.max(Number(today.split('-')[0]), Number((starts[starts.length - 1] ?? earliest).split('-')[0]));
+    const minYear = Number(starts[0].split('-')[0]);
+    const seen = new Set(starts);
+    for (let y = minYear; y <= maxYear; y++) {
+      for (const s of await this.computedPeriodStartsInYear(y)) {
+        if (s >= starts[0] && s <= today && !seen.has(s)) {
+          seen.add(s);
+          starts.push(s);
+        }
+      }
+    }
+
+    const sorted = Array.from(seen).sort();
+    await this.boundaryRepo.save(sorted.map((date) => this.boundaryRepo.create({ date })));
+  }
+
+  // Extends the stored boundaries forward so "today" always falls inside an up-to-date period.
+  private async ensureExtendedThroughToday(): Promise<void> {
+    const last = await this.boundaryRepo.find({ order: { date: 'DESC' }, take: 1 }).then((rows) => rows[0]);
+    if (!last) return;
+
+    const today = todayStr();
+    let current = last.date;
+    for (;;) {
+      const next = await this.computeNextBoundaryAfter(current);
+      if (!next || next > today) break;
+      await this.boundaryRepo.save(this.boundaryRepo.create({ date: next }));
+      current = next;
+    }
+  }
+
+  private async extendBoundariesByOne(): Promise<string | null> {
+    const last = await this.boundaryRepo.find({ order: { date: 'DESC' }, take: 1 }).then((rows) => rows[0]);
+    if (!last) return null;
+    const next = await this.computeNextBoundaryAfter(last.date);
+    if (!next) return null;
+    await this.boundaryRepo.save(this.boundaryRepo.create({ date: next }));
+    return next;
+  }
+
+  async getAllBoundaries(): Promise<string[]> {
+    await this.ensureSeeded();
+    await this.ensureExtendedThroughToday();
+    const rows = await this.boundaryRepo.find({ order: { date: 'ASC' } });
+    return rows.map((r) => r.date);
+  }
+
+  private rangeForIndex(boundaries: string[], idx: number): PeriodRange {
+    const start = boundaries[idx];
+    const end = idx + 1 < boundaries.length ? addDays(boundaries[idx + 1], -1) : null;
+    return { start, end };
+  }
+
+  private indexForReference(boundaries: string[], reference: string): number {
     let idx = -1;
-    for (let i = 0; i < triggerDates.length; i++) {
-      if (triggerDates[i] <= reference) idx = i;
+    for (let i = 0; i < boundaries.length; i++) {
+      if (boundaries[i] <= reference) idx = i;
       else break;
     }
-    if (idx === -1) {
-      const fallback = fixedDayPeriodContaining(anchorDay, reference);
-      if (fallback.end && fallback.end >= triggerDates[0]) {
-        return { start: fallback.start, end: addDays(triggerDates[0], -1) };
-      }
-      return fallback;
-    }
-    return this.periodRangeForTriggerIndex(triggerDates, idx);
-  }
-
-  // Returns the raw computed period for a given originalStart, without applying adjustments.
-  private async getComputedPeriod(originalStart: string): Promise<PeriodRange> {
-    const settings = await this.getSettings();
-    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
-      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
-      const idx = triggerDates.indexOf(originalStart);
-      if (idx !== -1) return this.periodRangeForTriggerIndex(triggerDates, idx);
-    }
-    return fixedDayPeriodContaining(settings.anchorDay, originalStart);
-  }
-
-  // Returns the originalStart of the adjacent computed period, without applying adjustments.
-  private async getComputedAdjacentOriginalStart(
-    originalStart: string,
-    direction: 'prev' | 'next',
-  ): Promise<string | null> {
-    const settings = await this.getSettings();
-    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
-      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
-      const idx = triggerDates.indexOf(originalStart);
-      if (idx !== -1) {
-        const newIdx = direction === 'next' ? idx + 1 : idx - 1;
-        if (newIdx >= 0 && newIdx < triggerDates.length) return triggerDates[newIdx];
-        return null;
-      }
-    }
-    return fixedDayAdjacent(settings.anchorDay, originalStart, direction).start;
-  }
-
-  private async applyAdjustment(period: PeriodRange): Promise<PeriodRange> {
-    const adj = await this.overrideRepo.findOne({ where: { originalStart: period.start } });
-    if (!adj) return period;
-    return { start: adj.customStart, end: adj.customEnd };
-  }
-
-  private async upsertAdjustment(
-    originalStart: string,
-    customStart: string,
-    customEnd: string | null,
-    autoCascaded: boolean,
-  ): Promise<void> {
-    let adj = await this.overrideRepo.findOne({ where: { originalStart } });
-    if (!adj) {
-      adj = this.overrideRepo.create({ originalStart, customStart, customEnd, autoCascaded });
-    } else {
-      adj.customStart = customStart;
-      adj.customEnd = customEnd;
-      adj.autoCascaded = autoCascaded;
-    }
-    await this.overrideRepo.save(adj);
+    return idx === -1 ? 0 : idx;
   }
 
   async getPeriod(periodStart?: string): Promise<PeriodRange> {
-    if (periodStart) {
-      const adjByCustom = await this.overrideRepo.findOne({ where: { customStart: periodStart } });
-      if (adjByCustom) {
-        return { start: adjByCustom.customStart, end: adjByCustom.customEnd };
-      }
+    const boundaries = await this.getAllBoundaries();
+    if (boundaries.length === 0) {
+      const settings = await this.getSettings();
+      return fixedDayPeriodContaining(settings.anchorDay, periodStart ?? todayStr());
     }
-
-    const settings = await this.getSettings();
     const reference = periodStart ?? todayStr();
-
-    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
-      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
-      if (triggerDates.length > 0) {
-        const period = this.transactionPeriodContaining(triggerDates, settings.anchorDay, reference);
-        return this.applyAdjustment(period);
-      }
-    }
-    return this.applyAdjustment(fixedDayPeriodContaining(settings.anchorDay, reference));
+    return this.rangeForIndex(boundaries, this.indexForReference(boundaries, reference));
   }
 
   async getAdjacentPeriod(periodStart: string, direction: 'prev' | 'next'): Promise<PeriodRange> {
-    const adjByCustom = await this.overrideRepo.findOne({ where: { customStart: periodStart } });
-    const navStart = adjByCustom ? adjByCustom.originalStart : periodStart;
-
-    const settings = await this.getSettings();
-
-    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
-      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
-      if (triggerDates.length > 0) {
-        const idx = triggerDates.indexOf(navStart);
-        if (idx !== -1) {
-          const newIdx = direction === 'next' ? idx + 1 : idx - 1;
-          if (newIdx >= 0 && newIdx < triggerDates.length) {
-            return this.applyAdjustment(this.periodRangeForTriggerIndex(triggerDates, newIdx));
-          }
-          if (direction === 'next') {
-            return this.applyAdjustment(this.periodRangeForTriggerIndex(triggerDates, idx));
-          }
-          return this.applyAdjustment(fixedDayPeriodContaining(settings.anchorDay, addDays(triggerDates[0], -1)));
-        }
-      }
+    const boundaries = await this.getAllBoundaries();
+    if (boundaries.length === 0) {
+      const settings = await this.getSettings();
+      return fixedDayAdjacent(settings.anchorDay, periodStart, direction);
     }
-    return this.applyAdjustment(fixedDayAdjacent(settings.anchorDay, navStart, direction));
+
+    let idx = boundaries.indexOf(periodStart);
+    if (idx === -1) idx = this.indexForReference(boundaries, periodStart);
+
+    const newIdx = direction === 'next' ? idx + 1 : idx - 1;
+    if (newIdx < 0) {
+      return this.rangeForIndex(boundaries, 0);
+    }
+    if (newIdx >= boundaries.length) {
+      const extended = await this.extendBoundariesByOne();
+      if (!extended) return this.rangeForIndex(boundaries, idx);
+      const all = await this.boundaryRepo.find({ order: { date: 'ASC' } }).then((rows) => rows.map((r) => r.date));
+      return this.rangeForIndex(all, all.length - 1);
+    }
+    return this.rangeForIndex(boundaries, newIdx);
   }
 
   async listPeriodsInYear(year: number): Promise<PeriodRange[]> {
-    const settings = await this.getSettings();
-
-    if (settings.mode === 'TRANSACTION' && settings.triggerDescription) {
-      const triggerDates = await this.getTriggerDates(settings.triggerDescription);
-      if (triggerDates.length > 0) {
-        const periods: PeriodRange[] = [];
-        for (let i = 0; i < triggerDates.length; i++) {
-          if (triggerDates[i].startsWith(String(year))) {
-            periods.push(this.periodRangeForTriggerIndex(triggerDates, i));
-          }
-        }
-        return periods;
+    const boundaries = await this.getAllBoundaries();
+    const ranges: PeriodRange[] = [];
+    for (let i = 0; i < boundaries.length; i++) {
+      if (boundaries[i].startsWith(String(year))) {
+        ranges.push(this.rangeForIndex(boundaries, i));
       }
     }
-
-    const periods: PeriodRange[] = [];
-    for (let month0 = 0; month0 < 12; month0++) {
-      periods.push(fixedDayPeriodFromStart(year, month0, settings.anchorDay));
-    }
-    return periods;
+    return ranges;
   }
 
   async listPeriodsWithTransactions(): Promise<PeriodInfo[]> {
+    const boundaries = await this.getAllBoundaries();
+    if (boundaries.length === 0) return [];
+
     const allTx = await this.txRepo.find({ select: ['transactionDate'] });
-    if (allTx.length === 0) return [];
-
     const dates = allTx.map((t) => t.transactionDate).sort();
-    const minYear = Number(dates[0].split('-')[0]);
-    const maxYear = Number(dates[dates.length - 1].split('-')[0]);
-
-    const adjustments = await this.overrideRepo.find();
-    const adjMap = new Map(adjustments.map((a) => [a.originalStart, a]));
-
-    const seen = new Set<string>();
-    const allPeriods: PeriodRange[] = [];
-    for (let y = minYear; y <= maxYear + 1; y++) {
-      for (const p of await this.listPeriodsInYear(y)) {
-        if (!seen.has(p.start)) {
-          seen.add(p.start);
-          allPeriods.push(p);
-        }
-      }
-    }
 
     const result: PeriodInfo[] = [];
-    for (const period of allPeriods) {
-      const adj = adjMap.get(period.start);
-      const effectiveStart = adj?.customStart ?? period.start;
-      const effectiveEnd = adj?.customEnd ?? period.end;
-
-      const count = dates.filter(
-        (d) => d >= effectiveStart && (effectiveEnd === null || d <= effectiveEnd),
-      ).length;
-
+    for (let i = 0; i < boundaries.length; i++) {
+      const range = this.rangeForIndex(boundaries, i);
+      const count = dates.filter((d) => d >= range.start && (range.end === null || d <= range.end)).length;
       if (count === 0) continue;
-
-      result.push({
-        originalStart: period.start,
-        start: effectiveStart,
-        end: effectiveEnd,
-        transactionCount: count,
-        hasAdjustment: !!adj,
-      });
+      result.push({ start: range.start, end: range.end, transactionCount: count });
     }
 
     return result.sort((a, b) => b.start.localeCompare(a.start));
   }
 
-  async setPeriodAdjustment(originalStart: string, dto: UpdatePeriodOverrideDto): Promise<PeriodInfo[]> {
-    if (dto.customEnd && dto.customStart > dto.customEnd) {
-      throw new BadRequestException('Startdatum moet voor einddatum liggen');
-    }
+  // Replaces the entire set of period boundaries atomically. `dates` are the start dates of
+  // every period; consecutive dates define each period's range, and the last one is open-ended.
+  // This is how periods are split (add a date), merged (remove a date) or moved (change a date).
+  async saveBoundaries(dates: string[]): Promise<PeriodInfo[]> {
+    const cleaned = Array.from(new Set(dates)).sort();
 
-    const prevOriginalStart = await this.getComputedAdjacentOriginalStart(originalStart, 'prev');
-    const nextOriginalStart = await this.getComputedAdjacentOriginalStart(originalStart, 'next');
-
-    // Validate: new start must leave room for the prev period (at least 1 day)
-    if (prevOriginalStart) {
-      const prevAdj = await this.overrideRepo.findOne({ where: { originalStart: prevOriginalStart } });
-      const prevEffectiveStart = prevAdj?.customStart ?? prevOriginalStart;
-      if (dto.customStart <= prevEffectiveStart) {
-        throw new BadRequestException(`Startdatum moet na ${prevEffectiveStart} liggen`);
+    const allTx = await this.txRepo.find({ select: ['transactionDate'] });
+    if (allTx.length > 0) {
+      const earliest = allTx.map((t) => t.transactionDate).sort()[0];
+      if (cleaned[0] > earliest) {
+        throw new BadRequestException(`De eerste periode moet beginnen op of voor ${earliest}`);
       }
     }
 
-    // Validate: new end must leave room for the next period (at least 1 day)
-    if (nextOriginalStart && dto.customEnd) {
-      const nextAdj = await this.overrideRepo.findOne({ where: { originalStart: nextOriginalStart } });
-      const nextComputedPeriod = await this.getComputedPeriod(nextOriginalStart);
-      const nextEffectiveEnd = nextAdj?.customEnd ?? nextComputedPeriod.end;
-      if (nextEffectiveEnd && dto.customEnd >= nextEffectiveEnd) {
-        throw new BadRequestException(`Einddatum moet voor ${nextEffectiveEnd} liggen`);
-      }
-    }
-
-    // Save the main adjustment (manual, not auto-cascaded)
-    await this.upsertAdjustment(originalStart, dto.customStart, dto.customEnd ?? null, false);
-
-    // Cascade to prev: set prev.end = newStart - 1
-    if (prevOriginalStart) {
-      const prevAdj = await this.overrideRepo.findOne({ where: { originalStart: prevOriginalStart } });
-      const newPrevEnd = addDays(dto.customStart, -1);
-      const prevCustomStart = prevAdj?.customStart ?? prevOriginalStart;
-      // Keep the prev adj's autoCascaded flag if it was already manually set
-      const cascadeFlag = !prevAdj || prevAdj.autoCascaded;
-      await this.upsertAdjustment(prevOriginalStart, prevCustomStart, newPrevEnd, cascadeFlag);
-    }
-
-    // Cascade to next: set next.start = newEnd + 1
-    if (nextOriginalStart && dto.customEnd) {
-      const nextAdj = await this.overrideRepo.findOne({ where: { originalStart: nextOriginalStart } });
-      const nextComputedPeriod = await this.getComputedPeriod(nextOriginalStart);
-      const newNextStart = addDays(dto.customEnd, 1);
-      const nextCustomEnd = nextAdj?.customEnd ?? nextComputedPeriod.end;
-      const cascadeFlag = !nextAdj || nextAdj.autoCascaded;
-      await this.upsertAdjustment(nextOriginalStart, newNextStart, nextCustomEnd, cascadeFlag);
-    }
-
-    return this.listPeriodsWithTransactions();
-  }
-
-  async removePeriodAdjustment(originalStart: string): Promise<PeriodInfo[]> {
-    const prevOriginalStart = await this.getComputedAdjacentOriginalStart(originalStart, 'prev');
-    const nextOriginalStart = await this.getComputedAdjacentOriginalStart(originalStart, 'next');
-
-    await this.overrideRepo.delete({ originalStart });
-
-    // Remove auto-cascaded adjustments on adjacent periods
-    if (prevOriginalStart) {
-      const prevAdj = await this.overrideRepo.findOne({ where: { originalStart: prevOriginalStart } });
-      if (prevAdj?.autoCascaded) {
-        await this.overrideRepo.delete({ originalStart: prevOriginalStart });
-      }
-    }
-    if (nextOriginalStart) {
-      const nextAdj = await this.overrideRepo.findOne({ where: { originalStart: nextOriginalStart } });
-      if (nextAdj?.autoCascaded) {
-        await this.overrideRepo.delete({ originalStart: nextOriginalStart });
-      }
-    }
+    await this.boundaryRepo.manager.transaction(async (manager) => {
+      await manager.clear(PeriodBoundary);
+      await manager.save(PeriodBoundary, cleaned.map((date) => ({ date })));
+    });
 
     return this.listPeriodsWithTransactions();
   }

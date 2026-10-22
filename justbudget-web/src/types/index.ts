@@ -129,11 +129,9 @@ export interface TriggerCandidate {
 }
 
 export interface PeriodInfo {
-  originalStart: string;
   start: string;
   end: string | null;
   transactionCount: number;
-  hasAdjustment: boolean;
 }
 
 export type InsightType = 'success' | 'warning' | 'danger' | 'info';

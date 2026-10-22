@@ -9,7 +9,7 @@ import { Transaction } from './entities/transaction.entity';
 import { CategoryRule } from './entities/category-rule.entity';
 import { Reservation } from './entities/reservation.entity';
 import { PeriodSettings } from './entities/period-settings.entity';
-import { PeriodOverride } from './entities/period-override.entity';
+import { PeriodBoundary } from './entities/period-boundary.entity';
 import { UiSettings } from './entities/ui-settings.entity';
 import { CategoriesModule } from './categories/categories.module';
 import { BudgetsModule } from './budgets/budgets.module';
@@ -30,7 +30,7 @@ const staticPath = join(__dirname, '..', 'public');
       type: 'sqljs',
       location: process.env.DB_PATH || 'budget-nest.db',
       autoSave: true,
-      entities: [Category, Budget, Transaction, CategoryRule, Reservation, PeriodSettings, PeriodOverride, UiSettings],
+      entities: [Category, Budget, Transaction, CategoryRule, Reservation, PeriodSettings, PeriodBoundary, UiSettings],
       synchronize: true,
     }),
     ...(existsSync(staticPath) ? [ServeStaticModule.forRoot({

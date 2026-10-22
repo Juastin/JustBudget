@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { PeriodsService } from './periods.service';
 import { UpdatePeriodSettingsDto } from './dto/update-period-settings.dto';
-import { UpdatePeriodOverrideDto } from './dto/update-period-override.dto';
+import { UpdatePeriodBoundariesDto } from './dto/update-period-boundaries.dto';
 
 @Controller('api')
 export class PeriodsController {
@@ -27,13 +27,9 @@ export class PeriodsController {
   @Get('periods/all')
   listPeriods() { return this.service.listPeriodsWithTransactions(); }
 
-  @Put('periods/:originalStart/adjustment')
-  setAdjustment(@Param('originalStart') originalStart: string, @Body() dto: UpdatePeriodOverrideDto) {
-    return this.service.setPeriodAdjustment(originalStart, dto);
-  }
+  @Get('periods/boundaries')
+  getBoundaries() { return this.service.getAllBoundaries(); }
 
-  @Delete('periods/:originalStart/adjustment')
-  removeAdjustment(@Param('originalStart') originalStart: string) {
-    return this.service.removePeriodAdjustment(originalStart);
-  }
+  @Put('periods/boundaries')
+  saveBoundaries(@Body() dto: UpdatePeriodBoundariesDto) { return this.service.saveBoundaries(dto.dates); }
 }

@@ -39,20 +39,14 @@ export function listPeriods(): Promise<PeriodInfo[]> {
   return apiFetch<PeriodInfo[]>('api/periods/all');
 }
 
-export function setPeriodAdjustment(
-  originalStart: string,
-  customStart: string,
-  customEnd: string | null,
-): Promise<PeriodInfo[]> {
-  return apiFetch<PeriodInfo[]>(`api/periods/${originalStart}/adjustment`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customStart, customEnd }),
-  });
+export function getPeriodBoundaries(): Promise<string[]> {
+  return apiFetch<string[]>('api/periods/boundaries');
 }
 
-export function removePeriodAdjustment(originalStart: string): Promise<PeriodInfo[]> {
-  return apiFetch<PeriodInfo[]>(`api/periods/${originalStart}/adjustment`, {
-    method: 'DELETE',
+export function savePeriodBoundaries(dates: string[]): Promise<PeriodInfo[]> {
+  return apiFetch<PeriodInfo[]>('api/periods/boundaries', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dates }),
   });
 }
