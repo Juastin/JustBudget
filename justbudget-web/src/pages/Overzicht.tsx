@@ -271,7 +271,7 @@ export default function Overzicht() {
           const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
           const jaarresAmt = reservations.totalMonthlyReservation;
           const nogTeBesteden = summary
-            ? summary.salary - reservatieAmt - jaarresAmt - displayTotalSpent
+            ? summary.salary - reservatieAmt - jaarresAmt - summary.totalSpent
             : 0;
           const parts: string[] = [];
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
@@ -279,12 +279,12 @@ export default function Overzicht() {
 
           return (
             <KPICard
-              label="Nog te besteden deze maand"
+              label="Nog te besteden tot nu"
               value={summary ? formatEuro(nogTeBesteden) : '—'}
               variant={summary ? (nogTeBesteden < 0 ? 'danger' : 'success') : 'default'}
               subtitleNode={summary ? (
                 <span className="text-gray-400 dark:text-gray-500">
-                  inkomen − {parts.length > 0 ? `${parts.join(' − ')} − ` : ''}uitgegeven
+                  inkomen − {parts.length > 0 ? `${parts.join(' − ')} − ` : ''}reeds uitgegeven
                 </span>
               ) : undefined}
             />
@@ -299,7 +299,7 @@ export default function Overzicht() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Snelle inzichten</h2>
             <div className="relative" ref={insightsEditRef}>
@@ -329,10 +329,12 @@ export default function Overzicht() {
               )}
             </div>
           </div>
-          <QuickInsightsList insights={combinedInsights} />
+          <div className="overflow-y-auto max-h-72 -mr-2 pr-2">
+            <QuickInsightsList insights={combinedInsights} />
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Top uitgaven</h2>
             <div className="relative" ref={editRef}>
@@ -366,21 +368,23 @@ export default function Overzicht() {
             </div>
           </div>
 
-          <div className="space-y-5">
-            {spotlightStatuses.map((s) => (
-              <div key={s.categoryId}>
-                <div className="flex justify-between items-baseline mb-1.5">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.category}</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {formatEuro(s.spent)}{s.budget !== 0 && <span className="text-xs"> / {formatEuro(s.budget)}</span>}
-                  </span>
+          <div className="overflow-y-auto max-h-72 -mr-2 pr-2">
+            <div className="space-y-5">
+              {spotlightStatuses.map((s) => (
+                <div key={s.categoryId}>
+                  <div className="flex justify-between items-baseline mb-1.5">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.category}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {formatEuro(s.spent)}{s.budget !== 0 && <span className="text-xs"> / {formatEuro(s.budget)}</span>}
+                    </span>
+                  </div>
+                  <ProgressBar percentage={s.budget !== 0 ? s.percentage : 0} height="sm" />
                 </div>
-                <ProgressBar percentage={s.budget !== 0 ? s.percentage : 0} height="sm" />
-              </div>
-            ))}
-            {spotlightStatuses.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-gray-500">Geen categorieën geselecteerd</p>
-            )}
+              ))}
+              {spotlightStatuses.length === 0 && (
+                <p className="text-sm text-gray-400 dark:text-gray-500">Geen categorieën geselecteerd</p>
+              )}
+            </div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex flex-col">
