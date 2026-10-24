@@ -236,11 +236,11 @@ export default function PdfImportModal({ isOpen, onClose, onImported }: Props) {
                   onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
                 />
                 {file ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-2 w-full min-w-0">
                     <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{file.name}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white max-w-full truncate px-4">{file.name}</p>
                     <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(0)} KB</p>
                     <button
                       onClick={(e) => { e.stopPropagation(); setFile(null); }}
