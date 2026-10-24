@@ -229,7 +229,7 @@ export default function Overzicht() {
             <span className="flex flex-col gap-0.5">
               {summary && summary.totalBudget > 0 && (
                 <span className="text-gray-400 dark:text-gray-500">
-                  incl. {formatEuro(summary.totalBudget)} gebudgeteerd
+                  t.o.v. {formatEuro(summary.totalBudget)} budget
                 </span>
               )}
               {summary && summary.previousTotalSpent > 0 && (
