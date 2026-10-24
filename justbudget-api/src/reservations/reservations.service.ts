@@ -70,8 +70,7 @@ export class ReservationsService {
     return (await this.repo.find({ order: { category: 'ASC', name: 'ASC' } })).map((r) => this.shape(r));
   }
 
-  async getSummary() {
-    const all = await this.findAll();
+  private summarize(all: ReturnType<typeof this.shape>[]) {
     const totalMonthly = Math.round(all.reduce((s, r) => s + r.monthlyAmount, 0) * 100) / 100;
 
     const categoryMap = new Map<string, ReturnType<typeof this.shape>[]>();
@@ -89,6 +88,19 @@ export class ReservationsService {
       .sort((a, b) => b.monthlyAmount - a.monthlyAmount);
 
     return { totalMonthly, byCategory };
+  }
+
+  async getSummary() {
+    return this.summarize(await this.findAll());
+  }
+
+  // Reservations with a startDate after `asOf` didn't exist yet at that point in time,
+  // so historical trend charts need to exclude them rather than using today's full list.
+  async getSummaryAsOf(asOf: string) {
+    const all = (await this.repo.find({ order: { category: 'ASC', name: 'ASC' } }))
+      .filter((r) => !r.startDate || r.startDate <= asOf)
+      .map((r) => this.shape(r));
+    return this.summarize(all);
   }
 
   async create(dto: CreateReservationDto) {

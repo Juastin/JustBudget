@@ -5,6 +5,7 @@ import Budgetten from './pages/Budgetten';
 import Transacties from './pages/Transacties';
 import Reserveringen from './pages/Reserveringen';
 import Settings from './pages/Settings';
+import Inzichten from './pages/Inzichten';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="budgetten" element={<Budgetten />} />
           <Route path="transacties" element={<Transacties />} />
           <Route path="reserveringen" element={<Reserveringen />} />
+          <Route path="inzichten" element={<Inzichten />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

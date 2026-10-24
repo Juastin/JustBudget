@@ -93,13 +93,13 @@ export class TransactionsService {
     return this.shape(saved);
   }
 
-  async getYearlyReservations() {
-    const rows = await this.repo.createQueryBuilder('t')
+  async getYearlyReservations(asOf?: string) {
+    const qb = this.repo.createQueryBuilder('t')
       .leftJoinAndSelect('t.category', 'category')
       .where('t.isRecurring = :r', { r: true })
-      .andWhere("t.recurringPeriod = 'yearly'")
-      .orderBy('t.amount', 'ASC')
-      .getMany();
+      .andWhere("t.recurringPeriod = 'yearly'");
+    if (asOf) qb.andWhere('t.transactionDate <= :asOf', { asOf });
+    const rows = await qb.orderBy('t.amount', 'ASC').getMany();
 
     const transactions = rows.map((r) => ({
       ...this.shape(r),

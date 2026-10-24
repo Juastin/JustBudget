@@ -9,4 +9,9 @@ export class InsightsController {
   get(@Query('periodStart') periodStart?: string) {
     return this.service.getInsights(periodStart);
   }
+
+  @Get('yearly-trend')
+  getYearlyTrend(@Query('year') year?: string) {
+    return this.service.getYearlyTrend(year ? Number(year) : new Date().getFullYear());
+  }
 }

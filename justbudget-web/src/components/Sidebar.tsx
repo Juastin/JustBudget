@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  exact: boolean;
+  icon: JSX.Element;
+}
+
+const navItems: NavItem[] = [
   {
     to: '/',
     label: 'Overzicht',
@@ -39,6 +46,16 @@ const navItems = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  },
+  {
+    to: '/inzichten',
+    label: 'Inzichten',
+    exact: false,
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 14l4-5 3 3 5-7" />
       </svg>
     ),
   },

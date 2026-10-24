@@ -134,6 +134,23 @@ export interface PeriodInfo {
   transactionCount: number;
 }
 
+export interface YearlyTrendCategory {
+  categoryId: number;
+  category: string;
+  spent: number;
+  budget: number;
+}
+
+export interface YearlyTrendPoint {
+  periodStart: string;
+  periodEnd: string | null;
+  monthLabel: string;
+  spendable: number;
+  totalSpent: number;
+  totalIncome: number;
+  categories: YearlyTrendCategory[];
+}
+
 export type InsightType = 'success' | 'warning' | 'danger' | 'info';
 
 export interface QuickInsight {
