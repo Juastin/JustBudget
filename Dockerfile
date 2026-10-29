@@ -1,5 +1,5 @@
 # Stage 1: build frontend
-FROM node:20-alpine AS frontend
+FROM node:26-alpine AS frontend
 WORKDIR /build
 COPY justbudget-web/package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY justbudget-web/ .
 RUN npm run build
 
 # Stage 2: build API
-FROM node:20-alpine AS api
+FROM node:26-alpine AS api
 WORKDIR /build
 COPY justbudget-api/package*.json ./
 RUN npm ci
@@ -15,7 +15,7 @@ COPY justbudget-api/ .
 RUN npm run build
 
 # Stage 3: production image
-FROM node:20-alpine
+FROM node:26-alpine
 WORKDIR /app
 COPY --from=api /build/dist ./dist
 COPY --from=api /build/node_modules ./node_modules
