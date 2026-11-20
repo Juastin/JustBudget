@@ -15,7 +15,7 @@ export class CategoryRulesService {
   ) {}
 
   async findAll() {
-    const rules = await this.repo.find({ relations: ['category'], order: { keyword: 'ASC' } });
+    const rules = await this.repo.find({ relations: { category: true }, order: { keyword: 'ASC' } });
     return rules.map((r) => ({
       id: r.id,
       keyword: r.keyword,
@@ -28,7 +28,7 @@ export class CategoryRulesService {
     const cat = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!cat) throw new NotFoundException('Categorie niet gevonden');
     const keyword = dto.keyword.toLowerCase().trim();
-    let rule = await this.repo.findOne({ where: { keyword }, relations: ['category'] });
+    let rule = await this.repo.findOne({ where: { keyword }, relations: { category: true } });
     if (rule) {
       rule.categoryId = dto.categoryId;
       rule.category = cat;
@@ -46,7 +46,7 @@ export class CategoryRulesService {
   }
 
   async applyToAll(id: number): Promise<{ updated: number }> {
-    const rule = await this.repo.findOne({ where: { id }, relations: ['category'] });
+    const rule = await this.repo.findOne({ where: { id }, relations: { category: true } });
     if (!rule) throw new NotFoundException('Regel niet gevonden');
 
     const transactions = await this.txRepo.find();
@@ -61,7 +61,7 @@ export class CategoryRulesService {
   }
 
   async findMatchingCategory(description: string): Promise<Category | null> {
-    const rules = await this.repo.find({ relations: ['category'] });
+    const rules = await this.repo.find({ relations: { category: true } });
     const lower = description.toLowerCase();
     const match = rules.find((r) => lower.includes(r.keyword));
     return match?.category ?? null;

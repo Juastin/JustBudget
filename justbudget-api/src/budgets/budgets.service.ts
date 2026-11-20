@@ -19,7 +19,7 @@ export class BudgetsService {
   async findAll() {
     await this.ensureBudgets();
     const budgets = await this.budgetRepo.find({
-      relations: ['category'],
+      relations: { category: true },
       order: { id: 'ASC' },
     });
     return budgets.map((b) => ({
@@ -33,7 +33,7 @@ export class BudgetsService {
   async getBudgetStatus(periodStart?: string) {
     await this.ensureBudgets();
     const { start, end } = await this.periodsService.getPeriod(periodStart);
-    const budgets = await this.budgetRepo.find({ relations: ['category'], order: { id: 'ASC' } });
+    const budgets = await this.budgetRepo.find({ relations: { category: true }, order: { id: 'ASC' } });
 
     const prev = await this.periodsService.getAdjacentPeriod(start, 'prev');
 
@@ -179,7 +179,7 @@ export class BudgetsService {
   async getYearlyAverages(year?: number) {
     await this.ensureBudgets();
     const targetYear = year ?? new Date().getFullYear();
-    const budgets = await this.budgetRepo.find({ relations: ['category'], order: { id: 'ASC' } });
+    const budgets = await this.budgetRepo.find({ relations: { category: true }, order: { id: 'ASC' } });
 
     const monthlySpent = new Map<number, number[]>();
     budgets.forEach((b) => monthlySpent.set(b.categoryId, []));
@@ -222,7 +222,7 @@ export class BudgetsService {
   }
 
   async update(id: number, dto: UpdateBudgetDto) {
-    const budget = await this.budgetRepo.findOne({ where: { id }, relations: ['category'] });
+    const budget = await this.budgetRepo.findOne({ where: { id }, relations: { category: true } });
     if (!budget) throw new NotFoundException('Budget niet gevonden');
     budget.amount = dto.amount;
     if (dto.notifyPaid !== undefined) budget.notifyPaid = dto.notifyPaid;

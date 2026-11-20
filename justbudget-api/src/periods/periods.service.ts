@@ -112,7 +112,7 @@ export class PeriodsService {
 
   async getTriggerCandidates(): Promise<TriggerCandidate[]> {
     const rows = await this.txRepo.find({
-      select: ['description', 'transactionDate', 'amount'],
+      select: { description: true, transactionDate: true, amount: true },
       order: { transactionDate: 'DESC' },
     });
 
@@ -137,7 +137,7 @@ export class PeriodsService {
   }
 
   private async getTriggerDates(triggerKey: string): Promise<string[]> {
-    const rows = await this.txRepo.find({ select: ['description', 'transactionDate'] });
+    const rows = await this.txRepo.find({ select: { description: true, transactionDate: true } });
     const dates = rows.filter((r) => normalizeKey(r.description) === triggerKey).map((r) => r.transactionDate);
     return Array.from(new Set(dates)).sort();
   }
@@ -176,7 +176,7 @@ export class PeriodsService {
     if (count > 0) return;
 
     const firstTx = await this.txRepo.find({
-      select: ['transactionDate'],
+      select: { transactionDate: true },
       order: { transactionDate: 'ASC' },
       take: 1,
     });
@@ -307,7 +307,7 @@ export class PeriodsService {
     const boundaries = await this.getAllBoundaries();
     if (boundaries.length === 0) return [];
 
-    const allTx = await this.txRepo.find({ select: ['transactionDate'] });
+    const allTx = await this.txRepo.find({ select: { transactionDate: true } });
     const dates = allTx.map((t) => t.transactionDate).sort();
 
     const result: PeriodInfo[] = [];
@@ -327,7 +327,7 @@ export class PeriodsService {
   async saveBoundaries(dates: string[]): Promise<PeriodInfo[]> {
     const cleaned = Array.from(new Set(dates)).sort();
 
-    const allTx = await this.txRepo.find({ select: ['transactionDate'] });
+    const allTx = await this.txRepo.find({ select: { transactionDate: true } });
     if (allTx.length > 0) {
       const earliest = allTx.map((t) => t.transactionDate).sort()[0];
       if (cleaned[0] > earliest) {

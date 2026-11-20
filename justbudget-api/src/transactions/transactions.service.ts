@@ -39,7 +39,7 @@ export class TransactionsService {
   private async findOneShaped(id: number) {
     const tx = await this.repo.findOne({
       where: { id },
-      relations: ['category', 'linkedExpense', 'reimbursements'],
+      relations: { category: true, linkedExpense: true, reimbursements: true },
     });
     if (!tx) throw new NotFoundException('Transactie niet gevonden');
     return this.shape(tx);
@@ -78,7 +78,7 @@ export class TransactionsService {
   }
 
   async setRecurring(id: number, isRecurring: boolean, period: 'monthly' | 'yearly' = 'monthly') {
-    const tx = await this.repo.findOne({ where: { id }, relations: ['category'] });
+    const tx = await this.repo.findOne({ where: { id }, relations: { category: true } });
     if (!tx) throw new NotFoundException('Transactie niet gevonden');
     tx.isRecurring = isRecurring;
     if (isRecurring) tx.recurringPeriod = period;
@@ -87,7 +87,7 @@ export class TransactionsService {
   }
 
   async setPeriod(id: number, period: 'monthly' | 'yearly') {
-    const tx = await this.repo.findOne({ where: { id }, relations: ['category'] });
+    const tx = await this.repo.findOne({ where: { id }, relations: { category: true } });
     if (!tx) throw new NotFoundException('Transactie niet gevonden');
     tx.recurringPeriod = period;
     const saved = await this.repo.save(tx);
@@ -148,7 +148,7 @@ export class TransactionsService {
   }
 
   async updateCategory(id: number, categoryId: number) {
-    const tx = await this.repo.findOne({ where: { id }, relations: ['category'] });
+    const tx = await this.repo.findOne({ where: { id }, relations: { category: true } });
     if (!tx) throw new NotFoundException('Transactie niet gevonden');
     const cat = await this.categoryRepo.findOneBy({ id: categoryId });
     if (!cat) throw new NotFoundException('Categorie niet gevonden');
