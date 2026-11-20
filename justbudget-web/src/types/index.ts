@@ -51,6 +51,7 @@ export interface Transaction {
   description: string;
   amount: number;
   transactionDate: string;
+  originalDate?: string;
   categoryId?: number;
   categoryName?: string;
   color?: string;
@@ -61,6 +62,25 @@ export interface Transaction {
   linkedExpenseId?: number;
   linkedExpenseDescription?: string;
   reimbursedTotal?: number;
+}
+
+export interface PlannedPayment {
+  id: number;
+  name: string;
+  amount: number;
+  dueDate: string;
+  // An unlinked expense with exactly this amount near the due date (probably the real payment)
+  likelyPaid?: { id: number; description: string; transactionDate: string } | null;
+}
+
+export interface PlannedPaymentCandidate {
+  id: number;
+  description: string;
+  amount: number;
+  transactionDate: string;
+  amountDiff: number; // candidate amount minus planned amount (absolute values)
+  dayDiff: number; // candidate date minus due date, in days
+  nameMatch: boolean;
 }
 
 export interface ReservationTransaction extends Transaction {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Category, CategoryRule, Transaction } from '../types';
 import { payPeriodLabel } from '../types';
-import { getTransactions, updateTransactionCategory, setTransactionRecurring, linkTransaction, unlinkTransaction } from '../services/transactionService';
+import { getTransactions, updateTransactionCategory, setTransactionRecurring, linkTransaction, unlinkTransaction, updateTransactionDate } from '../services/transactionService';
 import { getCategories, getRules, createRule, deleteRule, applyRuleToAll } from '../services/categoryService';
 import { usePeriodContext } from '../context/PeriodContext';
 import TransactionTable from '../components/TransactionTable';
@@ -47,6 +47,13 @@ export default function Transacties() {
   async function handleToggleRecurring(transaction: Transaction) {
     const updated = await setTransactionRecurring(transaction.id, !transaction.isRecurring);
     setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  }
+
+  async function handleChangeDate(transaction: Transaction, newDate: string) {
+    await updateTransactionDate(transaction.id, newDate);
+    // Refetch: the transaction may now belong to a different pay period.
+    const updated = await getTransactions(range?.start);
+    setTransactions(updated);
   }
 
   async function handleLink(transactionId: number, expenseId: number) {
@@ -186,6 +193,7 @@ export default function Transacties() {
           onToggleRecurring={handleToggleRecurring}
           onLink={setLinkingTransaction}
           onUnlink={handleUnlink}
+          onChangeDate={handleChangeDate}
         />
       )}
 

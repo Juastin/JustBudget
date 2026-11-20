@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Reservation, ReservationType } from '../types';
-import { formatEuro } from '../types';
+import type { PlannedPayment, PlannedPaymentCandidate, Reservation, ReservationType } from '../types';
+import { formatDate, formatEuro } from '../types';
+import { getPlannedPayments, getPlannedPaymentCandidates, createPlannedPayment, deletePlannedPayment, settlePlannedPayment } from '../services/plannedPaymentsService';
 import {
   getReservations,
   createReservation,
@@ -37,6 +38,22 @@ const EMPTY_FORM = {
   startDate: '',
   savedAmount: '',
 };
+
+// Short hint on how a candidate transaction differs from the planned payment
+function candidateHint(c: PlannedPaymentCandidate): string[] {
+  const hints: string[] = [];
+  if (c.amountDiff === 0) hints.push('zelfde bedrag');
+  else hints.push(`${c.amountDiff > 0 ? '+' : '−'}${formatEuro(Math.abs(c.amountDiff))}`);
+  if (c.dayDiff === 0) hints.push('zelfde dag');
+  else hints.push(`${Math.abs(c.dayDiff)} dag${Math.abs(c.dayDiff) !== 1 ? 'en' : ''} ${c.dayDiff > 0 ? 'later' : 'eerder'}`);
+  if (c.nameMatch) hints.push('naam komt overeen');
+  return hints;
+}
+
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
 
 function intervalLabel(type: ReservationType): string {
   if (type === 'afschrijving') return 'Levensduur';
@@ -81,11 +98,101 @@ export default function Reserveringen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [planned, setPlanned] = useState<PlannedPayment[]>([]);
+  const [plannedForm, setPlannedForm] = useState({ name: '', amount: '', dueDate: '' });
+  const [plannedError, setPlannedError] = useState<string | null>(null);
+  // Which planned payment has its "link to transaction" dropdown open
+  const [linkingId, setLinkingId] = useState<number | null>(null);
+  const [candidates, setCandidates] = useState<PlannedPaymentCandidate[] | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   useEffect(() => {
-    getReservations()
-      .then(setItems)
+    Promise.all([getReservations(), getPlannedPayments()])
+      .then(([r, p]) => {
+        setItems(r);
+        setPlanned(p);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleAddPlanned(e: React.FormEvent) {
+    e.preventDefault();
+    setPlannedError(null);
+    const amount = parseFloat(plannedForm.amount);
+    if (!plannedForm.name.trim()) return setPlannedError('Naam is verplicht');
+    if (!amount || amount <= 0) return setPlannedError('Bedrag moet groter dan 0 zijn');
+    if (!plannedForm.dueDate) return setPlannedError('Kies een datum');
+    try {
+      const created = await createPlannedPayment({ name: plannedForm.name.trim(), amount, dueDate: plannedForm.dueDate });
+      setPlanned((prev) => [...prev, created].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+      setPlannedForm({ name: '', amount: '', dueDate: '' });
+    } catch {
+      setPlannedError('Opslaan mislukt. Probeer opnieuw.');
+    }
+  }
+
+  async function handleDeletePlanned(id: number) {
+    await deletePlannedPayment(id);
+    setPlanned((prev) => prev.filter((p) => p.id !== id));
+    if (linkingId === id) closeLinking();
+  }
+
+  function openLinking(id: number) {
+    if (linkingId === id) return closeLinking();
+    setLinkingId(id);
+    setCandidates(null);
+    setCandidateSearch('');
+    setSelectedCandidateId(null);
+    setLinkError(null);
+  }
+
+  function closeLinking() {
+    setLinkingId(null);
+    setCandidates(null);
+    setCandidateSearch('');
+    setSelectedCandidateId(null);
+    setLinkError(null);
+  }
+
+  // Load the ranked candidates for the open dropdown; typing in the search box
+  // re-queries (debounced) and searches all expenses instead of only the ones near the due date.
+  useEffect(() => {
+    if (linkingId === null) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      getPlannedPaymentCandidates(linkingId, candidateSearch)
+        .then((result) => {
+          if (cancelled) return;
+          setCandidates(result);
+          setLinkError(null);
+          // Drop a selection that is no longer in the visible list
+          setSelectedCandidateId((sel) => (sel !== null && result.some((c) => c.id === sel) ? sel : null));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setCandidates([]);
+          setLinkError('Transacties ophalen mislukt.');
+        });
+    }, candidateSearch ? 250 : 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [linkingId, candidateSearch]);
+
+  // The real transaction exists, so the planned payment (the reservation) is released.
+  async function handleConfirmLink() {
+    if (linkingId === null || selectedCandidateId === null) return;
+    try {
+      await settlePlannedPayment(linkingId, selectedCandidateId);
+      setPlanned((prev) => prev.filter((p) => p.id !== linkingId));
+      closeLinking();
+    } catch {
+      setLinkError('Koppelen mislukt. Probeer opnieuw.');
+    }
+  }
 
   const intervalMonths =
     form.interval !== ''
@@ -388,6 +495,170 @@ export default function Reserveringen() {
           </div>
         </form>
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      </div>
+
+      {/* Planned payments (e.g. Klarna) */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-baseline justify-between mb-1">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Geplande betalingen</h2>
+          {planned.length > 0 && (
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {formatEuro(planned.reduce((s, p) => s + p.amount, 0))}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+          Bijv. een Klarna-betaling voor volgende maand. Telt mee als verwachte uitgave en wordt bij het importeren gekoppeld aan de echte afschrijving.
+        </p>
+
+        <form onSubmit={handleAddPlanned} className="grid sm:grid-cols-4 gap-3 mb-2">
+          <input
+            type="text"
+            placeholder="bijv. Klarna – Zalando"
+            value={plannedForm.name}
+            onChange={(e) => setPlannedForm((f) => ({ ...f, name: e.target.value }))}
+            className="sm:col-span-2 w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">€</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Bedrag"
+              value={plannedForm.amount}
+              onChange={(e) => setPlannedForm((f) => ({ ...f, amount: e.target.value }))}
+              className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <input
+            type="date"
+            value={plannedForm.dueDate}
+            onChange={(e) => setPlannedForm((f) => ({ ...f, dueDate: e.target.value }))}
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="sm:col-span-4 sm:justify-self-start bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Toevoegen
+          </button>
+        </form>
+        {plannedError && <p className="text-sm text-red-600 dark:text-red-400">{plannedError}</p>}
+
+        {planned.length > 0 && (
+          <div className="mt-3 divide-y divide-gray-100 dark:divide-gray-700">
+            {planned.map((p) => (
+              <div key={p.id} className="py-2.5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {formatDate(p.dueDate)}
+                      {p.dueDate < todayIso() && <span className="ml-2 text-amber-600 dark:text-amber-400">verlopen — nog niet gekoppeld</span>}
+                    </p>
+                    {p.likelyPaid && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 truncate">
+                        Mogelijk al betaald: {p.likelyPaid.description} ({formatDate(p.likelyPaid.transactionDate)}) — koppel om dubbel tellen te voorkomen
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatEuro(-p.amount)}</span>
+                    <button
+                      onClick={() => openLinking(p.id)}
+                      className={`text-xs font-medium transition-colors ${
+                        linkingId === p.id
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200'
+                      }`}
+                    >
+                      Koppel aan transactie {linkingId === p.id ? '▲' : '▼'}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlanned(p.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                      title="Verwijderen"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {linkingId === p.id && (
+                  <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30">
+                    <div className="px-3 pt-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Niet gevonden? Zoek in alle transacties…"
+                        value={candidateSearch}
+                        onChange={(e) => setCandidateSearch(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                        {candidateSearch.trim()
+                          ? 'Zoekresultaten uit alle transacties, meest gelijkende eerst'
+                          : `Meest gelijkende uitgaven rond ${formatDate(p.dueDate)} (bedrag, datum en naam)`}
+                      </p>
+                    </div>
+                    {candidates === null ? (
+                      <p className="px-3 py-3 text-xs text-gray-400">Laden…</p>
+                    ) : candidates.length === 0 ? (
+                      <p className="px-3 py-3 text-xs text-gray-400">
+                        {candidateSearch.trim() ? 'Geen uitgaven gevonden met deze zoekterm' : 'Geen uitgaven gevonden rond deze datum — probeer te zoeken'}
+                      </p>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {candidates.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => setSelectedCandidateId(c.id)}
+                            className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left transition-colors ${
+                              selectedCandidateId === c.id
+                                ? 'bg-blue-50 dark:bg-blue-900/30'
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                            }`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-sm text-gray-900 dark:text-white truncate">{c.description}</span>
+                              <span className="block text-xs text-gray-400 dark:text-gray-500">
+                                {formatDate(c.transactionDate)} · {candidateHint(c).join(' · ')}
+                              </span>
+                            </span>
+                            <span className="text-sm font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
+                              {formatEuro(c.amount)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-gray-200 dark:border-gray-600">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {linkError ?? 'De reservering vervalt zodra je koppelt.'}
+                      </p>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={closeLinking}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        >
+                          Annuleren
+                        </button>
+                        <button
+                          onClick={handleConfirmLink}
+                          disabled={selectedCandidateId === null}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
+                        >
+                          Koppelen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Items grouped by category */}

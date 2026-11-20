@@ -8,6 +8,7 @@ import { Budget } from './entities/budget.entity';
 import { Transaction } from './entities/transaction.entity';
 import { CategoryRule } from './entities/category-rule.entity';
 import { Reservation } from './entities/reservation.entity';
+import { PlannedPayment } from './entities/planned-payment.entity';
 import { PeriodSettings } from './entities/period-settings.entity';
 import { PeriodBoundary } from './entities/period-boundary.entity';
 import { UiSettings } from './entities/ui-settings.entity';
@@ -16,6 +17,7 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CategoryRulesModule } from './category-rules/category-rules.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { PlannedPaymentsModule } from './planned-payments/planned-payments.module';
 import { InsightsModule } from './insights/insights.module';
 import { ImportModule } from './import/import.module';
 import { PeriodsModule } from './periods/periods.module';
@@ -30,7 +32,7 @@ const staticPath = join(__dirname, '..', 'public');
       type: 'sqljs',
       location: process.env.DB_PATH || 'budget-nest.db',
       autoSave: true,
-      entities: [Category, Budget, Transaction, CategoryRule, Reservation, PeriodSettings, PeriodBoundary, UiSettings],
+      entities: [Category, Budget, Transaction, CategoryRule, Reservation, PlannedPayment, PeriodSettings, PeriodBoundary, UiSettings],
       synchronize: true,
     }),
     ...(existsSync(staticPath) ? [ServeStaticModule.forRoot({
@@ -43,6 +45,7 @@ const staticPath = join(__dirname, '..', 'public');
     TransactionsModule,
     CategoryRulesModule,
     ReservationsModule,
+    PlannedPaymentsModule,
     InsightsModule,
     ImportModule,
     PeriodsModule,

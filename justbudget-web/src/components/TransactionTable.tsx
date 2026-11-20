@@ -11,6 +11,7 @@ interface Props {
   onToggleRecurring?: (transaction: Transaction) => void;
   onLink?: (transaction: Transaction) => void;
   onUnlink?: (transaction: Transaction) => void;
+  onChangeDate?: (transaction: Transaction, newDate: string) => void;
 }
 
 function netAmount(t: Transaction): number {
@@ -29,10 +30,16 @@ function groupReimbursements(reimbursements: Transaction[]) {
     .sort((a, b) => b.count - a.count);
 }
 
-export default function TransactionTable({ transactions, categories, initialCategoryId, onChangeCategory, onToggleRecurring, onLink, onUnlink }: Props) {
+export default function TransactionTable({ transactions, categories, initialCategoryId, onChangeCategory, onToggleRecurring, onLink, onUnlink, onChangeDate }: Props) {
   const [search, setSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId ?? '');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [editingDateId, setEditingDateId] = useState<number | null>(null);
+
+  function commitDate(t: Transaction, value: string) {
+    setEditingDateId(null);
+    if (value && value !== t.transactionDate) onChangeDate?.(t, value);
+  }
 
   function toggleExpanded(id: number) {
     setExpandedIds((prev) => {
@@ -106,7 +113,40 @@ export default function TransactionTable({ transactions, categories, initialCate
             {topLevel.map((t) => (
               <Fragment key={t.id}>
                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(t.transactionDate)}</td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {onChangeDate && editingDateId === t.id ? (
+                      <input
+                        type="date"
+                        autoFocus
+                        defaultValue={t.transactionDate}
+                        onBlur={(e) => commitDate(t, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          if (e.key === 'Escape') setEditingDateId(null);
+                        }}
+                        className="px-2 py-0.5 border border-blue-400 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : onChangeDate ? (
+                      <button
+                        onClick={() => setEditingDateId(t.id)}
+                        title="Klik om de datum te wijzigen"
+                        className="hover:text-blue-600 dark:hover:text-blue-400 border-b border-dashed border-transparent hover:border-current transition-colors"
+                      >
+                        {formatDate(t.transactionDate)}
+                      </button>
+                    ) : (
+                      formatDate(t.transactionDate)
+                    )}
+                    {onChangeDate && t.originalDate && editingDateId !== t.id && (
+                      <button
+                        onClick={() => onChangeDate(t, t.originalDate!)}
+                        title={`Verplaatst van ${formatDate(t.originalDate)} — klik om terug te zetten`}
+                        className="ml-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-red-500 transition-colors"
+                      >
+                        ↩ verplaatst
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-900 dark:text-white">{t.description}</span>

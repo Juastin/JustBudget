@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BudgetStatus, BudgetSummary, ReservationSummary, QuickInsight, QuickInsightOptions, ReservationsResult, Transaction } from '../types';
-import { formatEuro, payPeriodLabel } from '../types';
+import type { BudgetStatus, BudgetSummary, PlannedPayment, ReservationSummary, QuickInsight, QuickInsightOptions, ReservationsResult, Transaction } from '../types';
+import { formatDate, formatEuro, payPeriodLabel } from '../types';
 import { getBudgetStatus, getBudgetSummary } from '../services/budgetService';
 import { getQuickInsights } from '../services/savingsService';
 import { getRecurringTransactions, getProjectedRecurring, getYearlyReservations, setTransactionPeriod, setTransactionRecurring, type RecurringResult } from '../services/transactionService';
 import { getReservationsSummary } from '../services/reservationsService';
+import { getPlannedPaymentsInPeriod } from '../services/plannedPaymentsService';
 import { getUiSettings, updateUiSettings } from '../services/uiSettingsService';
 import { usePeriodContext } from '../context/PeriodContext';
 import KPICard from '../components/KPICard';
@@ -35,6 +36,7 @@ export default function Overzicht() {
   const [allStatuses, setAllStatuses] = useState<BudgetStatus[]>([]);
   const [recurring, setRecurring] = useState<RecurringResult>({ transactions: [], total: 0 });
   const [projected, setProjected] = useState<Transaction[]>([]);
+  const [planned, setPlanned] = useState<PlannedPayment[]>([]);
   const [reservations, setReservations] = useState<ReservationsResult>({ transactions: [], totalMonthlyReservation: 0 });
   const [reservationsSummary, setReservationsSummary] = useState<ReservationSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,8 +66,10 @@ export default function Overzicht() {
       getBudgetStatus(range.start),
       getRecurringTransactions(range.start),
       getProjectedRecurring(range.start),
+      getPlannedPaymentsInPeriod(range.start),
     ])
-      .then(([s, i, statuses, rec, proj]) => {
+      .then(([s, i, statuses, rec, proj, plan]) => {
+        setPlanned(plan);
         setSummary(s);
         setInsights(i);
         setAllStatuses(statuses);
@@ -116,6 +120,8 @@ export default function Overzicht() {
     .sort((a, b) => b.spent - a.spent);
 
   const projectedTotal = projected.reduce((s, t) => s + Math.abs(t.amount), 0);
+  // Money set aside for planned one-off payments (e.g. Klarna) due in this period
+  const plannedTotal = planned.reduce((s, p) => s + p.amount, 0);
   const displayTotalSpent = summary ? summary.totalSpent + projectedTotal : 0;
   const overBudgetTotal = allStatuses
     .filter((s) => s.category !== 'Salaris' && s.category !== 'Overboekingen')
@@ -125,9 +131,9 @@ export default function Overzicht() {
   const underBudgetTotal = budgetCategoryStatuses
     .filter((s) => !s.overBudget)
     .reduce((sum, s) => sum + s.remaining, 0);
-  const overBudgetInsightTotal = budgetCategoryStatuses
-    .filter((s) => s.overBudget)
-    .reduce((sum, s) => sum + Math.abs(s.remaining), 0);
+  // Same sum as the "Verwacht saldo" card so the numbers match
+  // (includes spending in categories without a budget).
+  const overBudgetInsightTotal = overBudgetTotal;
 
   const aggregateInsights: QuickInsight[] = [];
   if (insightOptions.totalUnderBudget && underBudgetTotal > 0) {
@@ -141,7 +147,7 @@ export default function Overzicht() {
     aggregateInsights.push({
       id: -2,
       type: 'danger',
-      message: `In totaal ${formatEuro(overBudgetInsightTotal)} meer uitgegeven dan gebudgetteerd`,
+      message: `In totaal ${formatEuro(overBudgetInsightTotal)} meer uitgegeven dan gebudgetteerd (incl. categorieën zonder budget)`,
     });
   }
   const filteredInsights = insights.filter((i) => {
@@ -249,12 +255,13 @@ export default function Overzicht() {
           const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
           const jaarresAmt = reservations.totalMonthlyReservation;
           const verwachtSaldo = summary
-            ? summary.salary - summary.totalBudget - overBudgetTotal - reservatieAmt - jaarresAmt
+            ? summary.salary - summary.totalBudget - overBudgetTotal - reservatieAmt - jaarresAmt - plannedTotal
             : 0;
           const parts: string[] = [];
           if (overBudgetTotal > 0) parts.push(`${formatEuro(overBudgetTotal)} over budget`);
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
           if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
+          if (plannedTotal > 0) parts.push(`${formatEuro(plannedTotal)} gepland`);
 
           return (
             <KPICard
@@ -271,11 +278,12 @@ export default function Overzicht() {
           const reservatieAmt = reservationsSummary?.totalMonthly ?? 0;
           const jaarresAmt = reservations.totalMonthlyReservation;
           const nogTeBesteden = summary
-            ? summary.salary - reservatieAmt - jaarresAmt - summary.totalSpent
+            ? summary.salary - reservatieAmt - jaarresAmt - plannedTotal - summary.totalSpent
             : 0;
           const parts: string[] = [];
           if (reservatieAmt > 0) parts.push(`${formatEuro(reservatieAmt)} reserveringen`);
           if (jaarresAmt > 0) parts.push(`${formatEuro(jaarresAmt)} jaarreserv.`);
+          if (plannedTotal > 0) parts.push(`${formatEuro(plannedTotal)} gepland`);
 
           return (
             <KPICard
@@ -490,17 +498,45 @@ export default function Overzicht() {
         </div>
       </div>
 
-      {reservationsSummary && reservationsSummary.byCategory.length > 0 && (
+      {((reservationsSummary && reservationsSummary.byCategory.length > 0) || planned.length > 0) && (
         <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
           <div className="flex items-start justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Reserveringen</h2>
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              {formatEuro(reservationsSummary.totalMonthly)}
-              <span className="text-xs font-normal text-gray-400 dark:text-gray-500"> / mnd</span>
-            </p>
+            {reservationsSummary && reservationsSummary.byCategory.length > 0 && (
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                {formatEuro(reservationsSummary.totalMonthly)}
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500"> / mnd</span>
+              </p>
+            )}
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {reservationsSummary.byCategory.map((cat) => (
+            {planned.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-4">
+                <div className="flex items-baseline justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Geplande betalingen</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {formatEuro(plannedTotal)}
+                    <span className="text-xs font-normal text-gray-400">/periode</span>
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {planned.map((p) => (
+                    <div key={p.id} className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex justify-between">
+                        <span className="truncate mr-2">{p.name} · {formatDate(p.dueDate)}</span>
+                        <span className="shrink-0">{formatEuro(p.amount)}</span>
+                      </div>
+                      {p.likelyPaid && (
+                        <p className="text-amber-600 dark:text-amber-400">
+                          Mogelijk al betaald — telt nu dubbel, koppel bij Reserveringen
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {reservationsSummary?.byCategory.map((cat) => (
               <div key={cat.category} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                 <div className="flex items-baseline justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cat.category}</span>

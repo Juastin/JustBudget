@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Put, Query } from '@nestjs/common';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Matches } from 'class-validator';
 import { TransactionsService } from './transactions.service';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
 
@@ -10,6 +10,10 @@ class UpdateRecurringDto {
 
 class UpdatePeriodDto {
   @IsString() @IsIn(['monthly', 'yearly']) period: 'monthly' | 'yearly';
+}
+
+class UpdateDateDto {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) transactionDate: string;
 }
 
 class LinkTransactionDto {
@@ -53,6 +57,11 @@ export class TransactionsController {
   @Patch(':id/period')
   setPeriod(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePeriodDto) {
     return this.service.setPeriod(id, dto.period);
+  }
+
+  @Patch(':id/date')
+  setDate(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDateDto) {
+    return this.service.updateDate(id, dto.transactionDate);
   }
 
   @Patch(':id/link')

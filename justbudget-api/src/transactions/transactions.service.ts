@@ -23,6 +23,7 @@ export class TransactionsService {
       description: t.description,
       amount: Number(t.amount),
       transactionDate: t.transactionDate,
+      originalDate: t.originalDate ?? undefined,
       hash: t.hash,
       isRecurring: t.isRecurring,
       recurringPeriod: (t.recurringPeriod ?? 'monthly') as 'monthly' | 'yearly',
@@ -155,6 +156,20 @@ export class TransactionsService {
     tx.category = cat;
     const saved = await this.repo.save(tx);
     return this.shape(saved);
+  }
+
+  // Moves a transaction to another date (e.g. a bill received before payday that
+  // belongs to the next pay period). The hash is deliberately left untouched so
+  // re-importing the original statement still recognises it as a duplicate.
+  async updateDate(id: number, transactionDate: string) {
+    const tx = await this.repo.findOneBy({ id });
+    if (!tx) throw new NotFoundException('Transactie niet gevonden');
+    // Remember the imported date on the first move; moving back to it clears the marker.
+    const imported = tx.originalDate ?? tx.transactionDate;
+    tx.originalDate = transactionDate === imported ? null : imported;
+    tx.transactionDate = transactionDate;
+    await this.repo.save(tx);
+    return this.findOneShaped(id);
   }
 
   async linkToExpense(id: number, expenseId: number) {
